@@ -197,6 +197,8 @@ export const useDatasetStore = defineStore('dataset', () => {
     isChatOpen.value = true;
     const contextInfo = chartMeaningText ? ` (Context: ${chartMeaningText})` : '';
     const promptText = `Can you explain the key insights, economic drivers, and recommended roadmap for the graph "${chartTitle}"${contextInfo} based strictly on the trade dataset?`;
+    const contextInfo = chartMeaningText ? ` (Visual Context: ${chartMeaningText})` : '';
+    const promptText = `As a Senior Data Analyst, please explain the key data insights and analytical breakdown for the chart "${chartTitle}"${contextInfo} based strictly on the trade dataset.`;
     postChatMessage(promptText);
   }
 

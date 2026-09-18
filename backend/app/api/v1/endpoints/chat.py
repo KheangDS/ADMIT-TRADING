@@ -76,6 +76,7 @@ async def chat_with_dataset(payload: ChatRequest):
                 f"ROUND(SUM(weight_kg)/1000, 2) AS volume_ton, "
                 f"ROUND(SUM(val_khr)/{rate_val}, 2) AS val_usd, "
                 f"ROUND((SUM(val_khr)/{rate_val}) / NULLIF(SUM(weight_kg), 0), 3) AS price_usd_per_kg "
+                f"ROUND(SUM(val_khr)/{rate_val}, 2) AS val_usd "
                 f"FROM trade_data GROUP BY hs4_code, hs4_desc ORDER BY val_usd DESC"
             )
             
