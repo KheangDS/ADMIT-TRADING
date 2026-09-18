@@ -56,8 +56,20 @@
       </div>
 
       <!-- ECharts Rendering Container -->
-      <div class="h-64 w-full">
-        <v-chart class="w-full h-full" :option="chartOption" autoresize />
+      <div class="h-64 w-full relative">
+        <div 
+          v-if="filteredData.length === 0" 
+          class="h-full w-full flex flex-col items-center justify-center bg-slate-50/50 rounded-xl border border-dashed border-slate-200 text-center p-4"
+        >
+          <div class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-2">
+            <FilterXIcon class="w-5 h-5 text-slate-400" />
+          </div>
+          <p class="text-xs font-bold text-slate-700">No Export Records Found</p>
+          <p class="text-[11px] text-slate-400 mt-0.5 max-w-xs">
+            No trade activity recorded for the active chapter, time period, or destination market.
+          </p>
+        </div>
+        <v-chart v-else class="w-full h-full" :option="chartOption" autoresize />
       </div>
     </div>
 
@@ -68,7 +80,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { Sparkles as SparklesIcon } from 'lucide-vue-next';
+import { Sparkles as SparklesIcon, FilterX as FilterXIcon } from 'lucide-vue-next';
 import { use } from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import { BarChart, LineChart, PieChart } from 'echarts/charts';
@@ -359,34 +371,10 @@ const filteredData = computed(() => {
         proc_weight_ton: 0
       };
 
-      let rVal = item.raw_val_usd !== undefined ? item.raw_val_usd : (item.Raw_Val ? item.Raw_Val * 1e6 : 0);
-      let rTon = item.raw_weight_ton !== undefined ? item.raw_weight_ton : (item.Raw_Tonnes || 0);
-      let pVal = item.proc_val_usd !== undefined ? item.proc_val_usd : (item.Processed_Val ? item.Processed_Val * 1e6 : 0);
-      let pTon = item.proc_weight_ton !== undefined ? item.proc_weight_ton : (item.Processed_Tonnes || 0);
-
-      // Fallback: If values are 0, resolve from store category_details sub_products
-      if (rVal === 0 && pVal === 0 && def && store.dashboardData?.category_details) {
-        const subProducts = store.dashboardData.category_details[code]?.sub_products || [];
-        for (const sp of subProducts) {
-          const spCode = String(sp.hs8_code || '').replace('.0', '').padStart(8, '0');
-          if (def.rawCodes.includes(spCode)) {
-            rVal += sp.val_usd || 0;
-            rTon += sp.weight_tonnes || 0;
-          } else if (def.procCodes.includes(spCode)) {
-            pVal += sp.val_usd || 0;
-            pTon += sp.weight_tonnes || 0;
-          }
-        }
-      }
-
-      // Second Fallback: Check hs4_categories
-      if (rVal === 0 && pVal === 0 && store.dashboardData?.hs4_categories) {
-        const matched = store.dashboardData.hs4_categories.find(c => c.hs4_code === code);
-        if (matched) {
-          rVal = matched.val_usd || 0;
-          rTon = matched.weight_tonnes || 0;
-        }
-      }
+      const rVal = item.raw_val_usd !== undefined ? item.raw_val_usd : (item.Raw_Val ? item.Raw_Val * 1e6 : 0);
+      const rTon = item.raw_weight_ton !== undefined ? item.raw_weight_ton : (item.Raw_Tonnes || 0);
+      const pVal = item.proc_val_usd !== undefined ? item.proc_val_usd : (item.Processed_Val ? item.Processed_Val * 1e6 : 0);
+      const pTon = item.proc_weight_ton !== undefined ? item.proc_weight_ton : (item.Processed_Tonnes || 0);
 
       prev.raw_val_usd += rVal;
       prev.raw_weight_ton += rTon;
@@ -395,10 +383,9 @@ const filteredData = computed(() => {
       catMap.set(code, prev);
     }
 
-    // If catMap is still empty, initialize from HS8_PAIR_DEFS
-    if (catMap.size === 0 && store.dashboardData?.category_details) {
+    // Fallback ONLY when NO filters are active (global unfiltered view)
+    if (catMap.size === 0 && !store.isFiltered && store.dashboardData?.category_details) {
       for (const [code, def] of Object.entries(HS8_PAIR_DEFS)) {
-        if (hsFilter !== 'ALL' && hsFilter !== code) continue;
         const subProducts = store.dashboardData.category_details[code]?.sub_products || [];
         let rVal = 0, rTon = 0, pVal = 0, pTon = 0;
         for (const sp of subProducts) {
@@ -426,7 +413,7 @@ const filteredData = computed(() => {
       }
     }
 
-    // Slicer Scaling for sessions where price jump rows don't have year/country dimensions
+    // Slicer Scaling ONLY if rawList did not have year/country rows and filters are active
     if (!hasMultiDims && (yrFilter !== 'ALL' || ctryFilter !== 'ALL')) {
       const commodityChart = store.dashboardData?.level1_charts?.find(c => c.chart_id === 'chart_commodity_share');
       if (commodityChart && commodityChart.data) {
@@ -445,8 +432,8 @@ const filteredData = computed(() => {
           const filteredUsd = filteredRows.reduce((sum: number, d: any) => sum + (d.val_usd || 0), 0);
           const filteredTon = filteredRows.reduce((sum: number, d: any) => sum + (d.weight_ton || 0), 0);
 
-          const ratioVal = totalUsd > 0 ? (filteredUsd / totalUsd) : (filteredRows.length > 0 ? 1 : 0);
-          const ratioTon = totalTon > 0 ? (filteredTon / totalTon) : (filteredRows.length > 0 ? 1 : 0);
+          const ratioVal = totalUsd > 0 ? (filteredUsd / totalUsd) : 0;
+          const ratioTon = totalTon > 0 ? (filteredTon / totalTon) : 0;
 
           valObj.raw_val_usd *= ratioVal;
           valObj.proc_val_usd *= ratioVal;
@@ -456,7 +443,11 @@ const filteredData = computed(() => {
       }
     }
 
-    const aggregated = Array.from(catMap.values());
+    let aggregated = Array.from(catMap.values());
+    if (store.isFiltered) {
+      aggregated = aggregated.filter(c => (c.raw_val_usd > 0 || c.proc_val_usd > 0 || c.raw_weight_ton > 0 || c.proc_weight_ton > 0));
+    }
+
     const maxValUsd = aggregated.reduce((max, c) => Math.max(max, c.raw_val_usd, c.proc_val_usd), 0);
     const maxWeightTon = aggregated.reduce((max, c) => Math.max(max, c.raw_weight_ton, c.proc_weight_ton), 0);
     const useK = !isTonnes && maxValUsd < 1_000_000;
