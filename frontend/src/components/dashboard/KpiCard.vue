@@ -1,7 +1,7 @@
 <template>
-  <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-100 shadow-xs hover:shadow-md hover:border-slate-200/80 transition-all duration-200 flex flex-col justify-between">
+  <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-100 shadow-xs hover:shadow-md hover:border-slate-200/80 transition-all duration-200 flex flex-col justify-between min-h-[116px]">
     <!-- Card Header: Label & Icon Badge -->
-    <div class="flex items-center justify-between gap-2">
+    <div class="flex items-center justify-between gap-2 w-full">
       <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider truncate" :title="label">
         {{ label }}
       </span>
@@ -18,9 +18,9 @@
       </div>
     </div>
     
-    <!-- Card Body: Value & Unit -->
-    <div class="mt-3 flex items-baseline gap-2 flex-wrap">
-      <span class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">
+    <!-- Card Body: Value & Unit Centered -->
+    <div class="my-auto pt-3 pb-1 flex items-center justify-center gap-2 flex-wrap text-center">
+      <span class="text-2xl sm:text-[26px] font-black text-slate-900 tracking-tight leading-none">
         {{ formattedNumber }}
       </span>
       <span 
