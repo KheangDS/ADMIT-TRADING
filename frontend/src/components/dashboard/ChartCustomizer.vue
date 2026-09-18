@@ -578,18 +578,18 @@ const chartOption = computed(() => {
           const kg = Math.round(v * 1000 * 10) / 10;
           return `${kg.toLocaleString()} kg`;
         }
-        if (v >= 1000) return `${(v / 1000).toFixed(1)}k t`;
-        return `${v.toLocaleString()} t`;
+        if (v >= 1_000_000) return `${(v / 1e6).toFixed(2)}M t`;
+        return `${v.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 1 })} t`;
       } else if (isK) {
         if (v === 0) return '$0k';
-        return `$${v.toLocaleString()}k`;
+        return `$${v.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 1 })}k`;
       } else {
         if (v === 0) return '$0M';
         if (v < 1) {
           const kUsd = Math.round(v * 1000 * 10) / 10;
           return `$${kUsd.toLocaleString()}k`;
         }
-        return `$${v.toLocaleString()}M`;
+        return `$${v.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}M`;
       }
     };
 
@@ -811,6 +811,7 @@ const chartOption = computed(() => {
             if (isM) return `$${v}M`;
             if (isKg) return `${v.toLocaleString()} kg`;
             if (isTonnes) {
+              if (v >= 1_000_000) return `${(v / 1e6).toFixed(1)}M t`;
               if (v >= 1000) return `${(v / 1000).toFixed(1)}k t`;
               return `${v.toLocaleString()} t`;
             }
@@ -857,7 +858,7 @@ const chartOption = computed(() => {
           if (p.value < 1 && p.value > 0) {
             formatted = `$${(Math.round(p.value * 1000 * 10) / 10).toLocaleString()}k USD`;
           } else {
-            formatted = `$${p.value.toLocaleString()}M USD`;
+            formatted = `$${p.value.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}M USD`;
           }
         } else if (isKg) {
           formatted = `${p.value.toLocaleString()} kg`;
@@ -865,7 +866,7 @@ const chartOption = computed(() => {
           if (p.value < 1 && p.value > 0) {
             formatted = `${(Math.round(p.value * 1000 * 10) / 10).toLocaleString()} kg`;
           } else {
-            formatted = `${p.value.toLocaleString()} Tonnes`;
+            formatted = `${p.value.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 1 })} Tonnes`;
           }
         } else {
           formatted = `${p.value.toLocaleString()} ${currentUnit}`;
@@ -885,6 +886,7 @@ const chartOption = computed(() => {
           if (isM) return `$${v}M`;
           if (isKg) return `${v.toLocaleString()} kg`;
           if (isTonnes) {
+            if (v >= 1_000_000) return `${(v / 1e6).toFixed(1)}M t`;
             if (v >= 1000) return `${(v / 1000).toFixed(1)}k t`;
             return `${v.toLocaleString()} t`;
           }
@@ -924,8 +926,8 @@ const chartOption = computed(() => {
             if (isKg) return `${p.value} kg`;
             if (isTonnes) {
               if (p.value < 1 && p.value > 0) return `${Math.round(p.value * 1000 * 10) / 10} kg`;
-              if (p.value >= 1000) return `${(p.value / 1000).toFixed(1)}k t`;
-              return `${p.value} t`;
+              if (p.value >= 1_000_000) return `${(p.value / 1e6).toFixed(2)}M t`;
+              return `${p.value.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 1 })} t`;
             }
             return `${p.value}`;
           },
