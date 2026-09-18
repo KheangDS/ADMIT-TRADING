@@ -114,9 +114,6 @@
       </div>
     </div>
 
-    <!-- Category Selection Cards Grid -->
-    <CategoryCardGrid v-if="displayedCategories.length > 0" :categories="displayedCategories" />
-
     <!-- Executive Strategy Action Plan Cards -->
     <div v-if="store.dashboardData.executive_strategy.length > 0" class="bg-gradient-to-br from-slate-900 to-sky-950 p-6 rounded-2xl text-white shadow-lg">
       <div class="flex items-center gap-2 text-sky-400 font-bold text-xs uppercase tracking-wider mb-3">
@@ -143,7 +140,6 @@ import { useDatasetStore } from '../../stores/datasetStore';
 import KpiCard from './KpiCard.vue';
 import GraphSlicerPanel from './GraphSlicerPanel.vue';
 import ChartCustomizer from './ChartCustomizer.vue';
-import CategoryCardGrid from './CategoryCardGrid.vue';
 
 const store = useDatasetStore();
 

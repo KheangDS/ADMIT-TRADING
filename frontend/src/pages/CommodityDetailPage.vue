@@ -7,20 +7,17 @@
         <div class="flex items-center gap-2 mb-2 flex-wrap">
           <button
             @click="goBack"
-            class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl transition-colors shadow-xs"
+            class="cursor-pointer flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl transition-colors shadow-xs"
           >
             <ArrowLeftIcon class="w-3.5 h-3.5" />
-            <span>Back to Category</span>
+            <span>Back to Overview</span>
           </button>
           <span class="text-xs font-mono font-black px-2.5 py-1 rounded-lg bg-sky-100 text-sky-800">
             HS {{ commodity.hs8_code }}
           </span>
-          <router-link
-            :to="`/category/${commodity.hs4_code}`"
-            class="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"
-          >
+          <span class="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600">
             Chapter {{ commodity.hs4_code }}
-          </router-link>
+          </span>
         </div>
 
         <!-- Bilingual Product Title -->
@@ -389,11 +386,7 @@ const topMarketName = computed(() => {
 });
 
 const goBack = () => {
-  if (commodity.value?.hs4_code) {
-    router.push(`/category/${commodity.value.hs4_code}`);
-  } else {
-    router.push('/');
-  }
+  router.push('/');
 };
 
 const goToCompare = () => {

@@ -55,20 +55,6 @@ class Hs4CategorySummary(BaseModel):
     volume_share_pct: float
     unit_price_usd_per_kg: float
 
-class Hs8SubProductSummary(BaseModel):
-    hs8_code: str
-    hs8_desc: str
-    product_name: Optional[str] = None
-    name_en: Optional[str] = None
-    name_km: Optional[str] = None
-    hs4_code: str
-    weight_tonnes: float
-    val_usd: float
-    val_khr: Optional[float] = 0.0
-    unit_price_usd_per_kg: float
-    unit_price_khr_per_kg: Optional[float] = 0.0
-    revenue_share_pct: Optional[float] = 0.0
-
 class CommodityListItem(BaseModel):
     hs8_code: str
     hs4_code: str
@@ -76,27 +62,6 @@ class CommodityListItem(BaseModel):
     name_km: str
     val_usd: float
     weight_kg: float
-
-class CategoryDetailPayload(BaseModel):
-    hs4_code: str
-    hs4_desc: str
-    title_en: Optional[str] = None
-    title_km: Optional[str] = None
-    full_desc_en: Optional[str] = None
-    full_desc_km: Optional[str] = None
-    total_val_usd: float = 0.0
-    total_val_khr: float = 0.0
-    total_weight_ton: float = 0.0
-    avg_price_usd_per_kg: float = 0.0
-    avg_price_khr_per_kg: float = 0.0
-    num_markets: int = 0
-    hhi_score: Optional[float] = None
-    revenue_share_pct: float = 0.0
-    sub_products: List[Hs8SubProductSummary] = []
-    top_destinations: List[Dict[str, Any]] = []
-    monthly_trend: Optional[List[Dict[str, Any]]] = None
-    charts: List[ChartConfig] = []
-    ai_strategy: Optional[str] = None
 
 # --- Main Dashboard Payload ---
 class DashboardPayload(BaseModel):
@@ -115,7 +80,6 @@ class DashboardPayload(BaseModel):
     hhi_risk_score: float = 0.0
     is_high_risk: bool = False
     executive_strategy: List[str] = []
-    category_details: Dict[str, CategoryDetailPayload] = {}
     commodity_details: Dict[str, Any] = {}
     commodity_list: List[CommodityListItem] = []
 

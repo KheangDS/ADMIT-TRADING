@@ -1,6 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import MacroOverview from '../components/dashboard/MacroOverview.vue';
-import CategoryDrillDown from '../components/dashboard/CategoryDrillDown.vue';
 import CommodityDetailPage from '../pages/CommodityDetailPage.vue';
 import CommodityComparePage from '../pages/CommodityComparePage.vue';
 
@@ -9,12 +8,6 @@ const routes = [
     path: '/',
     name: 'Home',
     component: MacroOverview,
-  },
-  {
-    path: '/category/:hs4code',
-    name: 'CategoryDetail',
-    component: CategoryDrillDown,
-    props: true,
   },
   {
     path: '/commodity/:hs8code',

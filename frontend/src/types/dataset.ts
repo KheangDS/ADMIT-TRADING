@@ -36,21 +36,6 @@ export interface Hs4CategorySummary {
   unit_price_usd_per_kg: number;
 }
 
-export interface Hs8SubProductSummary {
-  hs8_code: string;
-  hs8_desc: string;
-  product_name?: string;
-  name_en?: string;
-  name_km?: string;
-  hs4_code: string;
-  weight_tonnes: number;
-  val_usd: number;
-  val_khr?: number;
-  unit_price_usd_per_kg: number;
-  unit_price_khr_per_kg?: number;
-  revenue_share_pct?: number;
-}
-
 export interface CommodityListItem {
   hs8_code: string;
   hs4_code: string;
@@ -111,28 +96,6 @@ export interface CommodityDetail {
   raw_vs_processed: RawVsProcessed | null;
 }
 
-export interface CategoryDetailPayload {
-  hs4_code: string;
-  hs4_desc: string;
-  title_en?: string;
-  title_km?: string;
-  full_desc_en?: string;
-  full_desc_km?: string;
-  total_val_usd?: number;
-  total_val_khr?: number;
-  total_weight_ton?: number;
-  avg_price_usd_per_kg?: number;
-  avg_price_khr_per_kg?: number;
-  num_markets?: number;
-  hhi_score?: number;
-  revenue_share_pct?: number;
-  sub_products: Hs8SubProductSummary[];
-  top_destinations: MarketBreakdownItem[];
-  monthly_trend?: MonthlyTrendItem[];
-  charts: ChartConfig[];
-  ai_strategy?: string;
-}
-
 export interface ExchangeRateInfo {
   rate: number;
   is_realtime: boolean;
@@ -158,7 +121,6 @@ export interface DashboardPayload {
   hhi_risk_score: number;
   is_high_risk: boolean;
   executive_strategy: string[];
-  category_details: Record<string, CategoryDetailPayload>;
   commodity_details: Record<string, CommodityDetail>;
   commodity_list: CommodityListItem[];
 }

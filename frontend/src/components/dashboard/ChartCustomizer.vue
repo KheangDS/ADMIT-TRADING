@@ -386,18 +386,17 @@ const filteredData = computed(() => {
     }
 
     // Fallback ONLY when NO filters are active (global unfiltered view)
-    if (catMap.size === 0 && !store.isFiltered && store.dashboardData?.category_details) {
+    if (catMap.size === 0 && !store.isFiltered && store.dashboardData?.commodity_details) {
       for (const [code, def] of Object.entries(HS8_PAIR_DEFS)) {
-        const subProducts = store.dashboardData.category_details[code]?.sub_products || [];
         let rVal = 0, rTon = 0, pVal = 0, pTon = 0;
-        for (const sp of subProducts) {
-          const spCode = String(sp.hs8_code || '').replace('.0', '').padStart(8, '0');
+        for (const [hs8, comm] of Object.entries(store.dashboardData.commodity_details)) {
+          const spCode = String(hs8 || '').replace('.0', '').padStart(8, '0');
           if (def.rawCodes.includes(spCode)) {
-            rVal += sp.val_usd || 0;
-            rTon += sp.weight_tonnes || 0;
+            rVal += comm.total_val_usd || 0;
+            rTon += comm.total_weight_ton || (comm.total_weight_kg ? comm.total_weight_kg / 1000 : 0);
           } else if (def.procCodes.includes(spCode)) {
-            pVal += sp.val_usd || 0;
-            pTon += sp.weight_tonnes || 0;
+            pVal += comm.total_val_usd || 0;
+            pTon += comm.total_weight_ton || (comm.total_weight_kg ? comm.total_weight_kg / 1000 : 0);
           }
         }
         if (rVal > 0 || pVal > 0 || rTon > 0 || pTon > 0) {

@@ -53,7 +53,6 @@ function createInitialDashboardPayload(): DashboardPayload {
     hhi_risk_score: 0.0,
     is_high_risk: false,
     executive_strategy: [],
-    category_details: {},
     commodity_details: {},
     commodity_list: []
   };
@@ -62,7 +61,6 @@ function createInitialDashboardPayload(): DashboardPayload {
 export const useDatasetStore = defineStore('dataset', () => {
   const dashboardData = ref<DashboardPayload>(createInitialDashboardPayload());
   const exchangeRate = ref<number>(4000);
-  const activeCategory = ref<string | null>(null);
   const isLoading = ref<boolean>(false);
   const validationError = ref<string | null>(null);
   const isChatOpen = ref<boolean>(false);
@@ -101,11 +99,6 @@ export const useDatasetStore = defineStore('dataset', () => {
     }
   ]);
 
-  const activeCategoryDetail = computed(() => {
-    if (!dashboardData.value || !activeCategory.value) return null;
-    return dashboardData.value.category_details[activeCategory.value] || null;
-  });
-
   async function fetchMasterData() {
     isLoading.value = true;
     validationError.value = null;
@@ -129,7 +122,6 @@ export const useDatasetStore = defineStore('dataset', () => {
   async function handleFileUpload(file: File) {
     isLoading.value = true;
     validationError.value = null;
-    activeCategory.value = null;
 
     try {
       const data = await uploadDataset(file, exchangeRate.value);
@@ -161,10 +153,6 @@ export const useDatasetStore = defineStore('dataset', () => {
         isLoading.value = false;
       }
     }
-  }
-
-  function selectCategory(hs4Code: string | null) {
-    activeCategory.value = hs4Code;
   }
 
   function toggleChat() {
@@ -215,8 +203,6 @@ export const useDatasetStore = defineStore('dataset', () => {
   return {
     dashboardData,
     exchangeRate,
-    activeCategory,
-    activeCategoryDetail,
     isLoading,
     validationError,
     isChatOpen,
@@ -232,7 +218,6 @@ export const useDatasetStore = defineStore('dataset', () => {
     fetchMasterData,
     handleFileUpload,
     setExchangeRate,
-    selectCategory,
     toggleChat,
     postChatMessage,
     askAboutChart
