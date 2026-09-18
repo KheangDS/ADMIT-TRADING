@@ -62,7 +62,7 @@ class RedisCacheService:
     def set_json(self, key: str, data: Any, ttl_seconds: Optional[int] = None) -> bool:
         """Serializes and stores JSON in Redis or fallback in-memory store."""
         ttl = ttl_seconds or settings.REDIS_DASHBOARD_TTL
-        payload_str = json.dumps(data)
+        payload_str = json.dumps(data, default=str)
 
         if self.is_redis_available and self._redis_client:
             try:
