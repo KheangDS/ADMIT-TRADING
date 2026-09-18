@@ -343,6 +343,7 @@ FORMATTING CONSTRAINTS:
                 context_summary += f"- HS8 {sp['hs8_code']} (HS4 {sp['hs4_code']} - {name}): Volume = {w:,.2f} Tonnes, Value = ${sp['val_usd']/1e6:.2f}M USD, Price = ${p:.2f}/kg\n"
 
         if duckdb_results:
+            context_summary += f"\n\nEXACT DUCKDB QUERY RESULTS ({len(duckdb_results)} rows):\n" + json.dumps(duckdb_results[:10], indent=2)
             context_summary += f"\n\nEXACT DUCKDB QUERY RESULTS ({len(duckdb_results)} rows):\n" + json.dumps(duckdb_results[:12], indent=2)
 
         prompt = f"""
@@ -355,6 +356,8 @@ USER QUESTION: "{question}"
 
 CRITICAL RULES:
 1. If the user greets or says casual messages ("hi", "hello"): reply in 1-2 friendly sentences only.
+2. If the user asks a specific trade question: answer directly and concisely with exact dataset numbers.
+3. Use clean English product names.
 2. If the user asks a specific trade question or clicks "Ask AI" on a chart: provide a complete, direct, data-backed answer with exact figures and percentages. Never state that data is missing if it is provided in the context above.
 3. Organize the response cleanly using structured markdown with bullet points and bold key numbers.
 4. Use clean English product and partner country names.

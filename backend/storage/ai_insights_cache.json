@@ -1,0 +1,29 @@
+{
+  "ff677289821514eaea946006ba778c335cf19d98b4acb3fc04984ee556a7c2bd": {
+    "commodity_bar_meaning": {
+      "explanation": "This bar chart displays the total export revenue and volume distribution across major 4-digit agricultural commodity chapters.",
+      "key_takeaway": "Cashew Nuts (HS 0801) serves as the primary export revenue engine, generating 74.3% of total agricultural trade value ($624.4M USD).",
+      "action": "Prioritize targeted fiscal incentives and industrial zone infrastructure for domestic value-addition processing."
+    },
+    "country_donut_meaning": {
+      "explanation": "This donut chart visualizes export market concentration across international destination countries.",
+      "key_takeaway": "Market concentration score (HHI = 7,150) reflects elevated concentration risk, with វៀតណាម serving as the lead buyer.",
+      "action": "Establish direct bilateral trade agreements and cold-chain shipping corridors to diversify into high-value consumer markets."
+    },
+    "price_jump_meaning": {
+      "explanation": "This side-by-side comparison illustrates the unit export price difference between raw commodities and processed products.",
+      "key_takeaway": "Processing raw commodities (such as shelling raw cashews or processing spices) unlocks a 2.4x to 5.0x increase in unit export value.",
+      "action": "Incentivize local agro-processing factories to capture higher value domestically rather than exporting raw unprocessed crops."
+    },
+    "seasonality_line_meaning": {
+      "explanation": "This dual-axis line chart tracks monthly export volume (tonnes) against export revenue ($USD) across the trade timeline.",
+      "key_takeaway": "Peak export volumes surge during the Q1 harvest cycle (February to April), followed by lower seasonal export volumes in Q3.",
+      "action": "Expand post-harvest cold-storage and warehouse warrant systems to stagger supply and capture premium off-season unit prices."
+    },
+    "executive_strategy": [
+      "Accelerate domestic agro-processing capacity for Cashew Nuts (HS 0801) to retain the 5.0x processing value multiplier domestically.",
+      "Diversify international trade destinations beyond វៀតណាម by securing direct phytosanitary trade protocols with regional and global markets.",
+      "Invest in temperature-controlled warehousing and logistical infrastructure to smooth out post-harvest price volatility."
+    ]
+  }
+}
