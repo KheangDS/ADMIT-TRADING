@@ -45,7 +45,10 @@ export interface Hs8SubProductSummary {
   hs4_code: string;
   weight_tonnes: number;
   val_usd: number;
+  val_khr?: number;
   unit_price_usd_per_kg: number;
+  unit_price_khr_per_kg?: number;
+  revenue_share_pct?: number;
 }
 
 export interface CommodityListItem {
@@ -111,8 +114,21 @@ export interface CommodityDetail {
 export interface CategoryDetailPayload {
   hs4_code: string;
   hs4_desc: string;
+  title_en?: string;
+  title_km?: string;
+  full_desc_en?: string;
+  full_desc_km?: string;
+  total_val_usd?: number;
+  total_val_khr?: number;
+  total_weight_ton?: number;
+  avg_price_usd_per_kg?: number;
+  avg_price_khr_per_kg?: number;
+  num_markets?: number;
+  hhi_score?: number;
+  revenue_share_pct?: number;
   sub_products: Hs8SubProductSummary[];
-  top_destinations: any[];
+  top_destinations: MarketBreakdownItem[];
+  monthly_trend?: MonthlyTrendItem[];
   charts: ChartConfig[];
   ai_strategy?: string;
 }
