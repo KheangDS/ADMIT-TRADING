@@ -228,13 +228,12 @@ async function copyToClipboard(text: string, id: string) {
 function renderFormattedResponse(rawText: string): string {
   if (!rawText) return '';
 
-  // 1. Normalize line breaks and clean leading/trailing whitespace
   let text = rawText.trim();
 
-  // 2. Format Section Dividers
+  // 1. Format Section Dividers
   text = text.replace(/^(?:---|___|\*\*\*)\s*$/gm, '<hr class="my-3 border-slate-200" />');
 
-  // 3. Format Headings (### 1. Key Insights -> Styled Badge Heading)
+  // 2. Format Headings (### 1. Key Insights -> Styled Badge Heading)
   text = text.replace(/^###\s*(?:(\d+)\.\s*)?([^\n]+)/gm, (_match, num, title) => {
     const numBadge = num
       ? `<span class="w-5 h-5 rounded-md bg-sky-100 text-sky-800 font-extrabold text-[11px] flex items-center justify-center shrink-0 border border-sky-200">${num}</span>`
@@ -247,12 +246,12 @@ function renderFormattedResponse(rawText: string): string {
     `;
   });
 
-  // 4. Format Subheadings (## Subtitle)
+  // 3. Format Subheadings (## Subtitle)
   text = text.replace(/^##\s*([^\n]+)/gm, `
     <h4 class="text-xs font-bold text-slate-800 mt-2 mb-1">$1</h4>
   `);
 
-  // 5. Format Numbered Lists (1. Item -> Styled Step)
+  // 4. Format Numbered Lists (1. Item -> Styled Step)
   text = text.replace(/^(\d+)\.\s+([^\n]+)/gm, `
     <div class="flex items-start gap-2.5 my-1.5 pl-1">
       <span class="w-4 h-4 rounded-full bg-slate-100 text-slate-700 font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5 border border-slate-200">$1</span>
@@ -260,7 +259,7 @@ function renderFormattedResponse(rawText: string): string {
     </div>
   `);
 
-  // 6. Format Bullet Points (* Item or - Item -> Clean Dot List)
+  // 5. Format Bullet Points (* Item or - Item -> Clean Dot List)
   text = text.replace(/^[\*\-]\s+([^\n]+)/gm, `
     <div class="flex items-start gap-2 my-1 pl-1">
       <span class="text-sky-600 font-black text-sm leading-none shrink-0 mt-0.5">•</span>
@@ -268,16 +267,16 @@ function renderFormattedResponse(rawText: string): string {
     </div>
   `);
 
-  // 7. Format Bold Text (**text**)
+  // 6. Format Bold Text (**text**)
   text = text.replace(/\*\*([^*]+)\*\*/g, '<strong class="font-black text-slate-900">$1</strong>');
 
-  // 8. Format Inline Code (`code`)
+  // 7. Format Inline Code (`code`)
   text = text.replace(/`([^`]+)`/g, '<code class="px-1.5 py-0.5 text-[11px] font-mono font-bold bg-slate-100 text-sky-700 rounded border border-slate-200">$1</code>');
 
-  // 9. Format Italic / Notes (*Note: ...*)
+  // 8. Format Italic / Notes (*Note: ...*)
   text = text.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<span class="italic text-slate-500 text-[11px]">$1</span>');
 
-  // 10. Split remaining blocks into clean paragraphs
+  // 9. Split remaining blocks into clean paragraphs
   const paragraphs = text.split(/\n{2,}/);
   return paragraphs
     .map(p => {
