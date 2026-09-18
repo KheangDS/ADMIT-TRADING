@@ -1,0 +1,18 @@
+# Credentials & Secrets
+.env
+*.env
+!.env.example
+
+# Python cache & virtualenv
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.coverage
+
+# Staging files & local storage
+*.tmp
+*.duckdb
+*.duckdb.wal
+storage/*.duckdb
+storage/*.duckdb.wal
