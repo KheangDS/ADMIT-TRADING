@@ -239,8 +239,10 @@ const filteredData = computed(() => {
     return aggregated.map(c => {
       let displayVal: number;
       if (isTonnes) {
+        displayVal = useKg ? Math.round(c.weight_ton * 1000 * 10) / 10 : Math.round(c.weight_ton * 10) / 10;
         displayVal = useKg ? Math.round(c.weight_ton * 1000 * 100) / 100 : Math.round(c.weight_ton * 100) / 100;
       } else {
+        displayVal = useK ? Math.round((c.val_usd / 1000) * 10) / 10 : Math.round((c.val_usd / 1e6) * 100) / 100;
         displayVal = useK ? Math.round((c.val_usd / 1000) * 100) / 100 : Math.round((c.val_usd / 1e6) * 100) / 100;
       }
       return {
@@ -458,9 +460,13 @@ const filteredData = computed(() => {
       let rawDisplay: number;
       let procDisplay: number;
       if (isTonnes) {
+        rawDisplay = useKg ? Math.round(c.raw_weight_ton * 1000 * 10) / 10 : Math.round(c.raw_weight_ton * 10) / 10;
+        procDisplay = useKg ? Math.round(c.proc_weight_ton * 1000 * 10) / 10 : Math.round(c.proc_weight_ton * 10) / 10;
         rawDisplay = useKg ? Math.round(c.raw_weight_ton * 1000 * 100) / 100 : Math.round(c.raw_weight_ton * 100) / 100;
         procDisplay = useKg ? Math.round(c.proc_weight_ton * 1000 * 100) / 100 : Math.round(c.proc_weight_ton * 100) / 100;
       } else {
+        rawDisplay = useK ? Math.round((c.raw_val_usd / 1000) * 10) / 10 : Math.round((c.raw_val_usd / 1e6) * 100) / 100;
+        procDisplay = useK ? Math.round((c.proc_val_usd / 1000) * 10) / 10 : Math.round((c.proc_val_usd / 1e6) * 100) / 100;
         rawDisplay = useK ? Math.round((c.raw_val_usd / 1000) * 100) / 100 : Math.round((c.raw_val_usd / 1e6) * 100) / 100;
         procDisplay = useK ? Math.round((c.proc_val_usd / 1000) * 100) / 100 : Math.round((c.proc_val_usd / 1e6) * 100) / 100;
       }

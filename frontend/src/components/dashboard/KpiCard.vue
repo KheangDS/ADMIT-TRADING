@@ -1,36 +1,34 @@
 <template>
-  <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-100 shadow-xs hover:shadow-md hover:border-slate-200/80 transition-all duration-200 flex flex-col justify-between min-h-[128px]">
+  <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-100 shadow-xs hover:shadow-md hover:border-slate-200/80 transition-all duration-200 flex flex-col justify-between">
     <!-- Card Header: Label & Icon Badge -->
-    <div class="flex items-start justify-between gap-2">
-      <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider line-clamp-1">
+    <div class="flex items-center justify-between gap-2">
+      <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider truncate" :title="label">
         {{ label }}
       </span>
       <div 
         class="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 shadow-2xs"
         :class="badgeColorClass"
       >
-        <DollarSignIcon v-if="label.includes('($)')" class="w-4 h-4 text-emerald-600" />
-        <CoinsIcon v-else-if="label.includes('(KHR)')" class="w-4 h-4 text-amber-600" />
+        <DollarSignIcon v-if="label.includes('($)') || label.includes('USD')" class="w-4 h-4 text-emerald-600" />
+        <CoinsIcon v-else-if="label.includes('(KHR)') || label.includes('(៛)')" class="w-4 h-4 text-amber-600" />
         <ScaleIcon v-else-if="label.includes('Volume')" class="w-4 h-4 text-sky-600" />
-        <GlobeIcon v-else-if="label.includes('Markets') || label.includes('Countries')" class="w-4 h-4 text-indigo-600" />
-        <BoxesIcon v-else-if="label.includes('Commodit') || label.includes('HS8')" class="w-4 h-4 text-purple-600" />
+        <GlobeIcon v-else-if="label.includes('Market') || label.includes('Countr') || label.includes('Destination')" class="w-4 h-4 text-indigo-600" />
+        <BoxesIcon v-else-if="label.includes('Commodit') || label.includes('HS8') || label.includes('Product')" class="w-4 h-4 text-purple-600" />
         <TrendingUpIcon v-else class="w-4 h-4 text-sky-600" />
       </div>
     </div>
     
     <!-- Card Body: Value & Unit -->
-    <div class="mt-2.5">
-      <div class="flex items-baseline gap-1.5 flex-wrap">
-        <span class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">
-          {{ formattedNumber }}
-        </span>
-        <span v-if="unitSuffix" class="text-xs font-bold text-slate-500">
-          {{ unitSuffix }}
-        </span>
-      </div>
-      <p class="text-[11px] text-slate-400 mt-1.5 font-medium leading-tight line-clamp-1">
-        {{ description }}
-      </p>
+    <div class="mt-3 flex items-baseline gap-2 flex-wrap">
+      <span class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">
+        {{ formattedNumber }}
+      </span>
+      <span 
+        v-if="unitSuffix" 
+        class="text-[11px] font-bold px-1.5 py-0.5 rounded-md text-slate-600 bg-slate-100/90 border border-slate-200/60 leading-none"
+      >
+        {{ unitSuffix }}
+      </span>
     </div>
   </div>
 </template>
@@ -49,16 +47,16 @@ import {
 const props = defineProps<{
   label: string;
   value: string;
-  description: string;
+  description?: string;
 }>();
 
 // Dynamic icon background classes
 const badgeColorClass = computed(() => {
-  if (props.label.includes('($)')) return 'bg-emerald-50 border border-emerald-100/80';
+  if (props.label.includes('($)') || props.label.includes('USD')) return 'bg-emerald-50 border border-emerald-100/80';
   if (props.label.includes('(KHR)') || props.label.includes('(៛)')) return 'bg-amber-50 border border-amber-100/80';
   if (props.label.includes('Volume')) return 'bg-sky-50 border border-sky-100/80';
-  if (props.label.includes('Markets') || props.label.includes('Countries')) return 'bg-indigo-50 border border-indigo-100/80';
-  if (props.label.includes('Commodit') || props.label.includes('HS8')) return 'bg-purple-50 border border-purple-100/80';
+  if (props.label.includes('Market') || props.label.includes('Countr') || props.label.includes('Destination')) return 'bg-indigo-50 border border-indigo-100/80';
+  if (props.label.includes('Commodit') || props.label.includes('HS8') || props.label.includes('Product')) return 'bg-purple-50 border border-purple-100/80';
   return 'bg-slate-50 border border-slate-100';
 });
 
@@ -98,15 +96,15 @@ const parsedValue = computed(() => {
     const num = val.replace('Tonnes', '').trim();
     return { number: num, unit: 'Tonnes' };
   }
-  // Format: "41 Countries" -> "41", unit: "Countries"
+  // Format: "41 Countries" -> "41", unit: "Markets"
   if (val.includes('Countries')) {
     const num = val.replace('Countries', '').trim();
-    return { number: num, unit: 'Countries' };
+    return { number: num, unit: 'Markets' };
   }
-  // Format: "20 Commodities" -> "20", unit: "HS8 Products"
-  if (val.includes('Commodities')) {
-    const num = val.replace('Commodities', '').trim();
-    return { number: num, unit: 'HS8 Products' };
+  // Format: "20 Commodities" -> "20", unit: "Commodities"
+  if (val.includes('Commodities') || val.includes('HS8 Products')) {
+    const num = val.replace(/Commodities|HS8 Products/g, '').trim();
+    return { number: num, unit: 'Commodities' };
   }
   
   return { number: val, unit: '' };

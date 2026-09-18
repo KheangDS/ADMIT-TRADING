@@ -27,35 +27,35 @@ def build_dashboard_payload(session_id: str, metrics: dict, exchange_rate: float
     # 1. KPI Cards
     summary_kpis = [
         KpiMetric(
-            label="Total Export Value ($)",
+            label="Total Value ($)",
             value=f"${total_val_usd/1e6:,.2f} Million USD",
             numeric_val=total_val_usd,
             unit="USD",
             description=f"Recalculated at $1 USD = {exchange_rate:,.0f} KHR"
         ),
         KpiMetric(
-            label="Total Export Value (KHR)",
+            label="Total Value (KHR)",
             value=f"៛{total_val_khr/1e9:,.2f} Billion KHR",
             numeric_val=total_val_khr,
             unit="KHR",
             description="Raw trade currency total"
         ),
         KpiMetric(
-            label="Total Export Volume",
+            label="Total Volume",
             value=f"{total_weight_ton:,.2f} Tonnes",
             numeric_val=total_weight_ton,
             unit="Tonnes",
             description="Total agricultural export weight"
         ),
         KpiMetric(
-            label="Active Destination Markets",
+            label="Destination Markets",
             value=f"{active_countries_count} Countries",
             numeric_val=float(active_countries_count),
-            unit="Countries",
+            unit="Markets",
             description="Active international trading partners"
         ),
         KpiMetric(
-            label="Total HS8 Commodities",
+            label="Total Commodities",
             value=f"{total_hs8_count} Commodities",
             numeric_val=float(total_hs8_count),
             unit="Commodities",

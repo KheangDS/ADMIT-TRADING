@@ -13,35 +13,35 @@ function createInitialDashboardPayload(): DashboardPayload {
     end_date: undefined,
     summary_kpis: [
       {
-        label: 'Total Export Value ($)',
+        label: 'Total Value ($)',
         value: '$0.00',
         numeric_val: 0,
         unit: 'USD',
         description: 'Awaiting dataset ingestion'
       },
       {
-        label: 'Total Export Value (KHR)',
+        label: 'Total Value (KHR)',
         value: '៛0.00 KHR',
         numeric_val: 0,
         unit: 'KHR',
         description: 'Raw trade currency total'
       },
       {
-        label: 'Total Export Volume',
+        label: 'Total Volume',
         value: '0.00 Tonnes',
         numeric_val: 0,
         unit: 'Tonnes',
         description: 'Total agricultural export weight'
       },
       {
-        label: 'Active Destination Markets',
+        label: 'Destination Markets',
         value: '0 Countries',
         numeric_val: 0,
-        unit: 'Countries',
+        unit: 'Markets',
         description: 'Active international trading partners'
       },
       {
-        label: 'Total HS8 Commodities',
+        label: 'Total Commodities',
         value: '0 Commodities',
         numeric_val: 0,
         unit: 'Commodities',
