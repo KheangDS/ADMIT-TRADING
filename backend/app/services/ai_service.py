@@ -309,6 +309,23 @@ FORMATTING CONSTRAINTS:
             title = cat.get('title_en') or cat.get('official_title') or cat.get('hs4_desc')
             context_summary += f"\n- HS {cat['hs4_code']} ({title}): ${cat['val_usd']/1e6:.2f}M USD ({cat['revenue_share_pct']:.1f}% share), Volume: {weight:,.2f} Tonnes, Price: ${cat['unit_price_usd_per_kg']:.2f}/kg"
 
+        # Attach Destination Countries Breakdown
+        top_destinations = metrics.get('country_summary', [])
+        if top_destinations:
+            context_summary += "\n\nDESTINATION COUNTRIES (TOP BUYER MARKETS):\n"
+            for c in top_destinations[:10]:
+                val = c.get('val_usd', 0)
+                share = (val / max(1.0, total_usd)) * 100.0
+                w = c.get('weight_ton', c.get('weight_tonnes', 0))
+                price = c.get('unit_price_usd_per_kg', 0)
+                context_summary += f"- {c.get('country')}: Value = ${val/1e6:.2f}M USD ({share:.1f}% share), Volume = {w:,.1f} Tonnes, Price = ${price:.2f}/kg\n"
+
+        # Attach Value-Added Price Spread Multipliers
+        context_summary += "\n\nVALUE-ADDED PROCESSING MULTIPLIERS:\n"
+        context_summary += "- Cashew: Raw In-Shell (HS 08013100) @ $1.23/kg vs Processed Shelled Kernel (HS 08013200) @ $6.12/kg (5.0x price jump)\n"
+        context_summary += "- Mango: Fresh Mangoes (HS 08045021) @ $0.28/kg vs Dried Mangoes (HS 08045022) @ $3.79/kg (13.5x price jump)\n"
+        context_summary += "- Pepper: Raw Pepper (HS 09041110) @ $4.10/kg vs Processed Pepper (HS 09041210) @ $9.85/kg (2.4x price jump)\n"
+
         if target_hs4:
             subprods = [sp for sp in hs8_list if str(sp.get('hs4_code')) == target_hs4]
             context_summary += f"\n\n8-DIGIT SUB-PRODUCTS BREAKDOWN FOR HS {target_hs4} ({len(subprods)} sub-products):\n"
@@ -326,7 +343,7 @@ FORMATTING CONSTRAINTS:
                 context_summary += f"- HS8 {sp['hs8_code']} (HS4 {sp['hs4_code']} - {name}): Volume = {w:,.2f} Tonnes, Value = ${sp['val_usd']/1e6:.2f}M USD, Price = ${p:.2f}/kg\n"
 
         if duckdb_results:
-            context_summary += f"\n\nEXACT DUCKDB QUERY RESULTS ({len(duckdb_results)} rows):\n" + json.dumps(duckdb_results[:10], indent=2)
+            context_summary += f"\n\nEXACT DUCKDB QUERY RESULTS ({len(duckdb_results)} rows):\n" + json.dumps(duckdb_results[:12], indent=2)
 
         prompt = f"""
 You are an intelligent, natural conversational AI Assistant for Cambodia Agricultural Trade Analytics.
@@ -338,8 +355,9 @@ USER QUESTION: "{question}"
 
 CRITICAL RULES:
 1. If the user greets or says casual messages ("hi", "hello"): reply in 1-2 friendly sentences only.
-2. If the user asks a specific trade question: answer directly and concisely with exact dataset numbers.
-3. Use clean English product names.
+2. If the user asks a specific trade question or clicks "Ask AI" on a chart: provide a complete, direct, data-backed answer with exact figures and percentages. Never state that data is missing if it is provided in the context above.
+3. Organize the response cleanly using structured markdown with bullet points and bold key numbers.
+4. Use clean English product and partner country names.
 """
 
         response = self._call_gemini_api(prompt, is_json=False)
