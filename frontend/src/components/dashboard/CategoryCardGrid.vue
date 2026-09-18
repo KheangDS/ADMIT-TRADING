@@ -5,8 +5,8 @@
         <h2 class="text-xl font-bold text-slate-900 tracking-tight">Explore Major Commodity Categories</h2>
         <p class="text-xs text-slate-500 mt-0.5">Click any category card below to drill-down into 8-digit sub-products & category analytics.</p>
       </div>
-      <span class="text-xs font-semibold text-sky-600 bg-sky-50 px-2.5 py-1 rounded-lg">
-        {{ categories.length }} HS4 Chapters Found
+      <span class="text-xs font-semibold text-sky-700 bg-sky-50 px-2.5 py-1 rounded-lg border border-sky-100">
+        {{ categories.length }} HS4 Chapters · {{ totalHs8CommoditiesCount }} HS8 Commodities Total
       </span>
     </div>
 
@@ -20,9 +20,14 @@
       >
         <div>
           <div class="flex items-center justify-between mb-2">
-            <span class="text-xs font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-mono">
-              HS {{ cat.hs4_code }}
-            </span>
+            <div class="flex items-center gap-1.5">
+              <span class="text-xs font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-mono">
+                HS {{ cat.hs4_code }}
+              </span>
+              <span class="text-[11px] font-semibold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded-md border border-purple-100/60">
+                {{ getSubProductCount(cat.hs4_code) }} HS8 Products
+              </span>
+            </div>
             <span class="text-xs font-black text-sky-600">
               {{ cat.revenue_share_pct.toFixed(1) }}% Share
             </span>
@@ -96,6 +101,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { ArrowRight as ArrowRightIcon } from 'lucide-vue-next';
 import type { Hs4CategorySummary } from '../../types/dataset';
@@ -133,5 +139,28 @@ const formatVolume = (tonnes: number): string => {
     return `${kg.toLocaleString()} kg`;
   }
   return `${(Math.round(tonnes * 10) / 10).toLocaleString()} Tonnes`;
+};
+
+const totalHs8CommoditiesCount = computed(() => {
+  if (store.dashboardData?.commodity_list?.length) {
+    return store.dashboardData.commodity_list.length;
+  }
+  const kpi = store.dashboardData?.summary_kpis?.find(k => k.label.includes('Commodit'));
+  if (kpi && kpi.numeric_val) return kpi.numeric_val;
+  return 20;
+});
+
+const getSubProductCount = (hs4Code: string): number => {
+  if (store.dashboardData?.category_details?.[hs4Code]?.sub_products) {
+    return store.dashboardData.category_details[hs4Code].sub_products.length;
+  }
+  const knownCounts: Record<string, number> = {
+    '0801': 2,
+    '0804': 2,
+    '0904': 9,
+    '0910': 6,
+    '1211': 1
+  };
+  return knownCounts[hs4Code] || 1;
 };
 </script>
