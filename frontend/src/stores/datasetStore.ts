@@ -13,21 +13,21 @@ function createInitialDashboardPayload(): DashboardPayload {
     end_date: undefined,
     summary_kpis: [
       {
-        label: 'Total Value ($)',
+        label: 'Revenue (USD)',
         value: '$0.00',
         numeric_val: 0,
         unit: 'USD',
         description: 'Awaiting dataset ingestion'
       },
       {
-        label: 'Total Value (KHR)',
+        label: 'Revenue (KHR)',
         value: '៛0.00 KHR',
         numeric_val: 0,
         unit: 'KHR',
         description: 'Raw trade currency total'
       },
       {
-        label: 'Total Volume',
+        label: 'Export Volume',
         value: '0.00 Tonnes',
         numeric_val: 0,
         unit: 'Tonnes',

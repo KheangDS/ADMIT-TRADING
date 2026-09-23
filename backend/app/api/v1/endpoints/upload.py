@@ -48,21 +48,21 @@ def build_dashboard_payload(
     # 1. Summary KPIs
     summary_kpis = [
         KpiMetric(
-            label="Total Export Value (USD)",
+            label="Revenue (USD)",
             value=f"${total_val_usd/1e6:,.2f}M USD",
             numeric_val=total_val_usd,
             unit="USD",
             description="Total agricultural export revenue"
         ),
         KpiMetric(
-            label="Total Export Value (KHR)",
+            label="Revenue (KHR)",
             value=f"{total_val_khr/1e9:,.2f}B KHR",
             numeric_val=total_val_khr,
             unit="KHR",
             description="Raw trade currency total"
         ),
         KpiMetric(
-            label="Total Volume",
+            label="Export Volume",
             value=f"{total_weight_ton:,.2f} Tonnes",
             numeric_val=total_weight_ton,
             unit="Tonnes",

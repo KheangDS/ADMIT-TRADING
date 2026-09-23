@@ -14,43 +14,75 @@
         </p>
       </div>
 
-      <!-- Metric Switcher: Volume vs Revenue with Unit Scales -->
-      <div class="flex items-center bg-slate-100 p-1 rounded-xl self-start sm:self-auto">
+      <!-- Metric Switcher & Theme Toggle -->
+      <div class="flex items-center gap-2 self-start sm:self-auto">
+        <div class="flex items-center bg-slate-100 p-1 rounded-xl">
+          <button
+            @click="activeMetric = 'VOLUME'"
+            class="px-3 py-1 text-xs font-bold rounded-lg transition-all"
+            :class="activeMetric === 'VOLUME' ? 'bg-white text-sky-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'"
+            title="Scale: kg / Metric Tonnes"
+          >
+            📦 Volume (Tonnes/kg)
+          </button>
+          <button
+            @click="activeMetric = 'REVENUE'"
+            class="px-3 py-1 text-xs font-bold rounded-lg transition-all"
+            :class="activeMetric === 'REVENUE' ? 'bg-white text-sky-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'"
+            title="Scale: $k / $M USD"
+          >
+            💰 Revenue ($USD)
+          </button>
+        </div>
+
+        <!-- Map Theme Toggle -->
         <button
-          @click="activeMetric = 'VOLUME'"
-          class="px-3 py-1 text-xs font-bold rounded-lg transition-all"
-          :class="activeMetric === 'VOLUME' ? 'bg-white text-sky-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'"
-          title="Scale: kg / Metric Tonnes"
+          @click="isDarkTheme = !isDarkTheme"
+          class="flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold rounded-xl border transition-all"
+          :class="isDarkTheme 
+            ? 'bg-slate-800 border-slate-700 text-amber-400 hover:bg-slate-700' 
+            : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 shadow-2xs'"
+          :title="isDarkTheme ? 'Switch to Light Theme' : 'Switch to Dark Theme'"
         >
-          📦 Volume (Tonnes/kg)
-        </button>
-        <button
-          @click="activeMetric = 'REVENUE'"
-          class="px-3 py-1 text-xs font-bold rounded-lg transition-all"
-          :class="activeMetric === 'REVENUE' ? 'bg-white text-sky-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'"
-          title="Scale: $k / $M USD"
-        >
-          💰 Revenue ($USD)
+          <span>{{ isDarkTheme ? '🌙 Dark' : '☀️ Light' }}</span>
         </button>
       </div>
     </div>
 
     <!-- ECharts Container -->
-    <div class="relative w-full h-[420px] sm:h-[500px] rounded-xl overflow-hidden bg-slate-950 border border-slate-800">
+    <div 
+      class="relative w-full h-[420px] sm:h-[500px] rounded-xl overflow-hidden border transition-colors select-none cursor-grab active:cursor-grabbing"
+      :class="isDarkTheme ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'"
+      style="touch-action: none; -webkit-user-select: none; user-select: none;"
+      @mousedown="handleMouseDown"
+      @mousemove="handleMouseMove"
+      @mouseup="handleMouseUp"
+      @mouseleave="handleMouseUp"
+      @wheel.prevent="handleWheel"
+      @touchstart="handleTouchStart"
+      @touchmove.prevent="handleTouchMove"
+      @touchend="handleTouchEnd"
+    >
       <!-- Cambodia Hub Badge -->
-      <div class="absolute top-3 left-3 z-10 bg-slate-900/90 backdrop-blur-xs px-3 py-1.5 rounded-xl border border-slate-700 text-xs text-slate-200 flex items-center gap-2 shadow-md">
+      <div 
+        class="absolute top-3 left-3 z-10 backdrop-blur-xs px-3 py-1.5 rounded-xl border text-xs flex items-center gap-2 shadow-xs transition-colors"
+        :class="isDarkTheme ? 'bg-slate-900/90 border-slate-700 text-slate-200' : 'bg-white/95 border-slate-200 text-slate-800'"
+      >
         <span class="relative flex h-2.5 w-2.5">
           <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
           <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
         </span>
-        <span class="font-bold text-white">Origin: Cambodia 🇰🇭</span>
+        <span class="font-bold" :class="isDarkTheme ? 'text-white' : 'text-slate-900'">Origin: Cambodia 🇰🇭</span>
         <span class="text-slate-400 text-[11px] font-sans">(កម្ពុជា)</span>
       </div>
 
       <!-- Active Metric Legend Badge -->
-      <div class="absolute top-3 right-3 z-10 bg-slate-900/90 backdrop-blur-xs px-3 py-1.5 rounded-xl border border-slate-700 text-xs text-slate-300 shadow-md">
+      <div 
+        class="absolute top-3 right-3 z-10 backdrop-blur-xs px-3 py-1.5 rounded-xl border text-xs shadow-xs transition-colors"
+        :class="isDarkTheme ? 'bg-slate-900/90 border-slate-700 text-slate-300' : 'bg-white/95 border-slate-200 text-slate-700'"
+      >
         <span class="text-slate-400">Scale: </span>
-        <strong :class="activeMetric === 'VOLUME' ? 'text-sky-400' : 'text-amber-400'">
+        <strong :class="activeMetric === 'VOLUME' ? (isDarkTheme ? 'text-sky-400' : 'text-sky-600') : (isDarkTheme ? 'text-amber-400' : 'text-amber-600')">
           {{ activeMetric === 'VOLUME' ? '📦 Volume (kg / Tonnes)' : '💰 Value ($k / $M USD)' }}
         </strong>
       </div>
@@ -58,21 +90,23 @@
       <!-- In-Map Country Intelligence Floating Card (Triggered by Map Click) -->
       <div
         v-if="selectedCountry"
-        class="absolute bottom-4 left-4 z-20 bg-slate-900/95 backdrop-blur-md border border-slate-700 p-4 rounded-xl shadow-2xl text-white max-w-xs w-full transition-all animate-in fade-in"
+        class="absolute bottom-4 left-4 z-20 backdrop-blur-md border p-4 rounded-xl shadow-xl max-w-xs w-full transition-all animate-in fade-in"
+        :class="isDarkTheme ? 'bg-slate-900/95 border-slate-700 text-white' : 'bg-white/98 border-slate-200 text-slate-900'"
       >
-        <div class="flex items-center justify-between pb-2 border-b border-slate-800 mb-2.5">
+        <div class="flex items-center justify-between pb-2 border-b mb-2.5" :class="isDarkTheme ? 'border-slate-800' : 'border-slate-100'">
           <div class="flex items-center gap-2">
             <span class="text-xl">{{ getCountryFlag(selectedCountry.country) }}</span>
             <div>
-              <h4 class="font-bold text-sm text-white leading-tight">
+              <h4 class="font-bold text-sm leading-tight" :class="isDarkTheme ? 'text-white' : 'text-slate-900'">
                 {{ getDisplayCountryName(selectedCountry.country) }}
               </h4>
               <span class="text-[10px] text-slate-400 font-sans">Destination Partner</span>
             </div>
           </div>
           <button
-            @click="selectedCountry = null"
-            class="w-6 h-6 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-xs font-bold"
+            @click="closeSelectedCountry"
+            class="w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold transition-colors"
+            :class="isDarkTheme ? 'bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-900'"
             title="Close country details"
           >
             ✕
@@ -80,27 +114,27 @@
         </div>
 
         <div class="space-y-2 text-xs">
-          <div class="flex items-center justify-between bg-slate-800/60 p-2 rounded-lg border border-slate-700/50">
-            <span class="text-slate-400">Export Revenue:</span>
+          <div class="flex items-center justify-between p-2 rounded-lg border" :class="isDarkTheme ? 'bg-slate-800/60 border-slate-700/50' : 'bg-slate-50 border-slate-100'">
+            <span class="text-slate-500">Export Revenue:</span>
             <div class="text-right">
-              <strong class="text-amber-400 font-bold block">{{ formatRevenueUsd(selectedCountry.val_usd) }}</strong>
-              <span class="text-[10px] text-emerald-400 font-semibold">{{ countrySharePct(selectedCountry) }}% Share</span>
+              <strong class="font-bold block" :class="isDarkTheme ? 'text-amber-400' : 'text-amber-600'">{{ formatRevenueUsd(selectedCountry.val_usd) }}</strong>
+              <span class="text-[10px] font-semibold" :class="isDarkTheme ? 'text-emerald-400' : 'text-emerald-600'">{{ countrySharePct(selectedCountry) }}% Share</span>
             </div>
           </div>
 
-          <div class="flex items-center justify-between bg-slate-800/60 p-2 rounded-lg border border-slate-700/50">
-            <span class="text-slate-400">Export Volume:</span>
-            <strong class="text-sky-300 font-bold">{{ formatVolumeKg(selectedCountry.weight_kg) }}</strong>
+          <div class="flex items-center justify-between p-2 rounded-lg border" :class="isDarkTheme ? 'bg-slate-800/60 border-slate-700/50' : 'bg-slate-50 border-slate-100'">
+            <span class="text-slate-500">Export Volume:</span>
+            <strong class="font-bold" :class="isDarkTheme ? 'text-sky-300' : 'text-sky-700'">{{ formatVolumeKg(selectedCountry.weight_kg) }}</strong>
           </div>
 
           <!-- Country-Specific Average Price -->
-          <div class="flex items-center justify-between bg-emerald-950/40 p-2 rounded-lg border border-emerald-800/40">
-            <span class="text-emerald-300 font-semibold">Country Avg Price:</span>
+          <div class="flex items-center justify-between p-2 rounded-lg border" :class="isDarkTheme ? 'bg-emerald-950/40 border-emerald-800/40' : 'bg-emerald-50 border-emerald-200'">
+            <span class="font-semibold" :class="isDarkTheme ? 'text-emerald-300' : 'text-emerald-800'">Country Avg Price:</span>
             <div class="text-right">
-              <strong class="text-emerald-400 font-mono font-bold block">
+              <strong class="font-mono font-bold block" :class="isDarkTheme ? 'text-emerald-400' : 'text-emerald-700'">
                 ${{ countryAvgPriceUsd(selectedCountry) }}/kg
               </strong>
-              <span class="text-[10px] text-slate-400">
+              <span class="text-[10px]" :class="isDarkTheme ? 'text-slate-400' : 'text-slate-500'">
                 ({{ countryAvgPriceKhr(selectedCountry) }} ៛/kg)
               </span>
             </div>
@@ -159,13 +193,16 @@ import {
   GridComponent,
 } from 'echarts/components';
 import VChart from 'vue-echarts';
-import { Globe as GlobeIcon } from 'lucide-vue-next';
+import {
+  Globe as GlobeIcon,
+} from 'lucide-vue-next';
 import worldGeoJson from '../../assets/world.json';
 import type { MarketBreakdownItem } from '../../types/dataset';
 import {
   getCountryMeta,
   getCountryFlag,
   getDisplayCountryName,
+  isSameCountry,
   CAMBODIA_COORDS
 } from '../../utils/countryRegistry';
 
@@ -192,10 +229,141 @@ const props = defineProps<{
   exchangeRate?: number;
 }>();
 
+const chartRef = ref<any>(null);
 const activeMetric = ref<'VOLUME' | 'REVENUE'>('VOLUME');
+const isDarkTheme = ref<boolean>(false);
 const selectedCountry = ref<MarketBreakdownItem | null>(null);
 
+// Interactive Drag / Pan & Touch Handling
+const isDragging = ref<boolean>(false);
+const hasMoved = ref<boolean>(false);
+let startX = 0;
+let startY = 0;
+let lastX = 0;
+let lastY = 0;
 
+let touchStartX = 0;
+let touchStartY = 0;
+let touchLastX = 0;
+let touchLastY = 0;
+let touchStartDist = 0;
+
+const getChartInstance = () => {
+  if (!chartRef.value) return null;
+  return (chartRef.value as any).chart || chartRef.value;
+};
+
+const panMap = (dx: number, dy: number) => {
+  const inst = getChartInstance();
+  if (!inst || typeof inst.dispatchAction !== 'function') return;
+  inst.dispatchAction({
+    type: 'geoRoam',
+    componentType: 'geo',
+    dx,
+    dy,
+  });
+};
+
+const handleMouseDown = (e: MouseEvent) => {
+  if (e.button !== 0) return;
+  isDragging.value = true;
+  hasMoved.value = false;
+  startX = e.clientX;
+  startY = e.clientY;
+  lastX = e.clientX;
+  lastY = e.clientY;
+};
+
+const handleMouseMove = (e: MouseEvent) => {
+  if (!isDragging.value) return;
+  const dx = e.clientX - lastX;
+  const dy = e.clientY - lastY;
+  if (Math.hypot(e.clientX - startX, e.clientY - startY) > 4) {
+    hasMoved.value = true;
+  }
+  lastX = e.clientX;
+  lastY = e.clientY;
+  panMap(dx, dy);
+};
+
+const handleMouseUp = () => {
+  isDragging.value = false;
+  setTimeout(() => {
+    hasMoved.value = false;
+  }, 50);
+};
+
+const handleWheel = (e: WheelEvent) => {
+  const inst = getChartInstance();
+  if (!inst || typeof inst.dispatchAction !== 'function') return;
+  const zoomFactor = e.deltaY < 0 ? 1.15 : 0.87;
+  const rect = (e.currentTarget as HTMLElement)?.getBoundingClientRect?.() || { left: 0, top: 0 };
+  const originX = e.clientX - rect.left;
+  const originY = e.clientY - rect.top;
+  inst.dispatchAction({
+    type: 'geoRoam',
+    componentType: 'geo',
+    zoom: zoomFactor,
+    originX,
+    originY,
+  });
+};
+
+const handleTouchStart = (e: TouchEvent) => {
+  if (e.touches.length === 1) {
+    hasMoved.value = false;
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+    touchLastX = touchStartX;
+    touchLastY = touchStartY;
+  } else if (e.touches.length === 2) {
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    touchStartDist = Math.hypot(dx, dy);
+  }
+};
+
+const handleTouchMove = (e: TouchEvent) => {
+  const inst = getChartInstance();
+  if (!inst || typeof inst.dispatchAction !== 'function') return;
+  if (e.touches.length === 1) {
+    const curX = e.touches[0].clientX;
+    const curY = e.touches[0].clientY;
+    const dx = curX - touchLastX;
+    const dy = curY - touchLastY;
+    if (Math.hypot(curX - touchStartX, curY - touchStartY) > 6) {
+      hasMoved.value = true;
+    }
+    touchLastX = curX;
+    touchLastY = curY;
+    panMap(dx, dy);
+  } else if (e.touches.length === 2) {
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    const dist = Math.hypot(dx, dy);
+    if (touchStartDist > 0 && dist > 0) {
+      const zoom = dist / touchStartDist;
+      const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      const rect = (e.currentTarget as HTMLElement)?.getBoundingClientRect?.() || { left: 0, top: 0 };
+      inst.dispatchAction({
+        type: 'geoRoam',
+        componentType: 'geo',
+        zoom: zoom > 1 ? 1.05 : 0.95,
+        originX: midX - rect.left,
+        originY: midY - rect.top,
+      });
+      touchStartDist = dist;
+    }
+  }
+};
+
+const handleTouchEnd = () => {
+  touchStartDist = 0;
+  setTimeout(() => {
+    hasMoved.value = false;
+  }, 50);
+};
 
 const totalValUsd = computed(() => {
   return (props.marketData || []).reduce((acc, m) => acc + (m.val_usd || 0), 0);
@@ -236,17 +404,26 @@ const formatVolumeKg = (kg: number): string => {
   return `${(Math.round(tonnes * 10) / 10).toLocaleString()} Tonnes`;
 };
 
+const closeSelectedCountry = () => {
+  selectedCountry.value = null;
+  const inst = getChartInstance();
+  if (inst && typeof inst.dispatchAction === 'function') {
+    inst.dispatchAction({ type: 'hideTip' });
+  }
+};
+
 const onMapClick = (params: any) => {
+  if (hasMoved.value) return;
+
+  const inst = getChartInstance();
+  if (inst && typeof inst.dispatchAction === 'function') {
+    inst.dispatchAction({ type: 'hideTip' });
+  }
+
   if (params.data?.rawMarket) {
     selectedCountry.value = params.data.rawMarket;
   } else if (params.name) {
-    const matched = props.marketData.find(m => {
-      const meta = getCountryMeta(m.country);
-      return m.country === params.name || 
-             meta.en.toLowerCase() === params.name.toLowerCase() ||
-             params.name.includes(meta.en) ||
-             params.name.includes(m.country);
-    });
+    const matched = props.marketData.find(m => isSameCountry(m.country, params.name));
     if (matched) {
       selectedCountry.value = matched;
     }
@@ -256,6 +433,7 @@ const onMapClick = (params: any) => {
 // Compute ECharts Option with registered 'world' GeoJSON
 const mapChartOption = computed(() => {
   const mktList = props.marketData || [];
+  const isDark = isDarkTheme.value;
 
   const cambodiaHub = {
     name: 'Cambodia (Origin / ប្រទេសដើមកំណើត)',
@@ -284,19 +462,23 @@ const mapChartOption = computed(() => {
           show: true,
           formatter: () => `${meta.flag} ${meta.en}`,
           position: 'top',
-          color: '#f8fafc',
+          color: isDark ? '#f8fafc' : '#0f172a',
           fontSize: 10,
           fontWeight: 'bold',
-          textBorderColor: '#090d16',
+          textBorderColor: isDark ? '#090d16' : '#ffffff',
           textBorderWidth: 3,
           distance: 6,
         },
         itemStyle: {
-          color: activeMetric.value === 'VOLUME' ? '#38bdf8' : '#fbbf24',
+          color: activeMetric.value === 'VOLUME'
+            ? (isDark ? '#38bdf8' : '#0284c7')
+            : (isDark ? '#fbbf24' : '#d97706'),
           borderColor: '#ffffff',
           borderWidth: 1.5,
-          shadowBlur: 14,
-          shadowColor: activeMetric.value === 'VOLUME' ? 'rgba(56, 189, 248, 0.8)' : 'rgba(251, 191, 36, 0.8)',
+          shadowBlur: isDark ? 14 : 6,
+          shadowColor: activeMetric.value === 'VOLUME' 
+            ? (isDark ? 'rgba(56, 189, 248, 0.8)' : 'rgba(2, 132, 199, 0.4)')
+            : (isDark ? 'rgba(251, 191, 36, 0.8)' : 'rgba(217, 119, 6, 0.4)'),
         },
       };
     });
@@ -313,82 +495,33 @@ const mapChartOption = computed(() => {
     });
 
   return {
-    backgroundColor: '#090d16',
+    backgroundColor: isDark ? '#090d16' : '#f8fafc',
     tooltip: {
-      trigger: 'item',
-      backgroundColor: 'rgba(15, 23, 42, 0.95)',
-      borderColor: '#334155',
-      borderWidth: 1,
-      padding: [10, 14],
-      textStyle: { color: '#f8fafc', fontSize: 12 },
-      formatter: (params: any) => {
-        if (params.seriesType === 'lines') {
-          return `<div class="font-bold text-sky-400">✈️ Trade Flow: Cambodia 🇰🇭 → ${params.data.toName}</div>`;
-        }
-        if (params.data?.name && params.data.name.includes('Cambodia (Origin')) {
-          return `<div class="p-1">
-            <div class="font-bold text-emerald-400 text-sm">🇰🇭 Cambodia (Origin Country)</div>
-            <div class="text-xs text-slate-300 mt-0.5">Agricultural Trade Hub (ភ្នំពេញ)</div>
-          </div>`;
-        }
-        const m = params.data?.rawMarket;
-        const meta = params.data?.meta;
-        if (!m) return params.name;
-        const flag = meta?.flag || '🌐';
-        const enName = meta?.en || m.country;
-        const share = countrySharePct(m);
-        const unitPriceUsd = countryAvgPriceUsd(m);
-        const unitPriceKhr = countryAvgPriceKhr(m);
-
-        return `
-          <div class="p-1 space-y-1.5 min-w-[220px]">
-            <div class="flex items-center justify-between border-b border-slate-700 pb-1.5">
-              <div>
-                <span class="font-black text-sm text-white">${flag} ${enName}</span>
-                <span class="text-xs text-slate-400 font-sans block">${m.country}</span>
-              </div>
-              <span class="text-xs font-black text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-800/50">${share}% Share</span>
-            </div>
-            <div class="text-xs space-y-1 pt-0.5">
-              <div class="flex justify-between">
-                <span class="text-slate-400">Volume (បរិមាណ):</span>
-                <strong class="text-sky-300 font-bold">${formatVolumeKg(m.weight_kg)}</strong>
-              </div>
-              <div class="flex justify-between">
-                <span class="text-slate-400">Revenue (ចំណូល $):</span>
-                <strong class="text-amber-300 font-bold">${formatRevenueUsd(m.val_usd)}</strong>
-              </div>
-              <div class="flex justify-between border-t border-slate-800 pt-1">
-                <span class="text-slate-400">Country Avg Price:</span>
-                <strong class="text-emerald-400 font-mono font-bold">$${unitPriceUsd}/kg <span class="text-[11px] text-slate-400 font-sans">(${unitPriceKhr} ៛)</span></strong>
-              </div>
-            </div>
-          </div>
-        `;
-      }
+      show: false,
     },
     geo: {
       map: 'world',
       roam: true,
+      scaleLimit: { min: 0.8, max: 15 },
       zoom: 1.18,
       center: [55, 20],
       label: {
         show: false,
         emphasis: {
           show: true,
-          color: '#ffffff',
+          color: isDark ? '#ffffff' : '#0f172a',
           fontSize: 10,
         }
       },
       itemStyle: {
-        areaColor: '#1e293b',
-        borderColor: '#334155',
+        areaColor: isDark ? '#1e293b' : '#e2e8f0',
+        borderColor: isDark ? '#334155' : '#cbd5e1',
         borderWidth: 0.8,
       },
       emphasis: {
         itemStyle: {
-          areaColor: '#0284c7',
-          borderColor: '#38bdf8',
+          areaColor: isDark ? '#0284c7' : '#bae6fd',
+          borderColor: isDark ? '#38bdf8' : '#0284c7',
           borderWidth: 1.5,
         }
       }
@@ -399,17 +532,22 @@ const mapChartOption = computed(() => {
         name: 'Export Routes',
         type: 'lines',
         coordinateSystem: 'geo',
-        zlevel: 1,
+        z: 2,
+        silent: true,
         effect: {
           show: true,
           period: 4,
           trailLength: 0.25,
           symbol: 'arrow',
           symbolSize: 6,
-          color: activeMetric.value === 'VOLUME' ? '#38bdf8' : '#fbbf24',
+          color: activeMetric.value === 'VOLUME'
+            ? (isDark ? '#38bdf8' : '#0284c7')
+            : (isDark ? '#fbbf24' : '#d97706'),
         },
         lineStyle: {
-          color: activeMetric.value === 'VOLUME' ? 'rgba(56, 189, 248, 0.45)' : 'rgba(251, 191, 36, 0.45)',
+          color: activeMetric.value === 'VOLUME'
+            ? (isDark ? 'rgba(56, 189, 248, 0.45)' : 'rgba(2, 132, 199, 0.45)')
+            : (isDark ? 'rgba(251, 191, 36, 0.45)' : 'rgba(217, 119, 6, 0.45)'),
           width: 1.8,
           curveness: 0.22,
         },
@@ -420,7 +558,7 @@ const mapChartOption = computed(() => {
         name: 'Destination Markets',
         type: 'scatter',
         coordinateSystem: 'geo',
-        zlevel: 2,
+        z: 3,
         data: scatterPoints,
       },
       // Pulsing Cambodia Origin Hub
@@ -428,7 +566,8 @@ const mapChartOption = computed(() => {
         name: 'Cambodia Hub',
         type: 'effectScatter',
         coordinateSystem: 'geo',
-        zlevel: 3,
+        z: 4,
+        silent: true,
         rippleEffect: {
           brushType: 'stroke',
           scale: 4,

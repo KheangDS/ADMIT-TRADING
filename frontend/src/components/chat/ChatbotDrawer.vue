@@ -13,7 +13,7 @@
     <!-- Floating Chatbot Drawer Panel -->
     <div
       v-if="store.isChatOpen"
-      class="fixed bottom-24 right-4 sm:right-6 z-40 w-[420px] sm:w-[480px] md:w-[520px] max-w-[calc(100vw-2rem)] h-[620px] max-h-[82vh] bg-white rounded-3xl shadow-2xl border border-slate-200/90 flex flex-col justify-between overflow-hidden animate-in fade-in slide-in-from-bottom-4"
+      class="fixed bottom-20 sm:bottom-24 inset-x-3 sm:inset-x-auto sm:right-6 z-40 sm:w-[480px] md:w-[520px] h-[calc(100vh-6.5rem)] sm:h-[620px] max-h-[85vh] bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200/90 flex flex-col justify-between overflow-hidden animate-in fade-in slide-in-from-bottom-4"
     >
       <!-- Chat Header -->
       <div class="px-5 py-3.5 bg-gradient-to-r from-slate-900 via-sky-950 to-indigo-950 text-white flex items-center justify-between border-b border-slate-800 shadow-sm">

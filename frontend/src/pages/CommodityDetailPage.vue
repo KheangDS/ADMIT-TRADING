@@ -162,27 +162,27 @@
     <!-- Raw vs Processed Comparison Section (Conditional) -->
     <div
       v-if="commodity.raw_vs_processed"
-      class="bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 p-6 sm:p-8 rounded-3xl text-white shadow-lg border border-slate-700"
+      class="bg-gradient-to-br from-white via-indigo-50/30 to-slate-50 p-6 sm:p-8 rounded-2xl text-slate-900 shadow-sm border border-slate-200/90"
     >
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 pb-4 border-b border-slate-700">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 pb-4 border-b border-slate-200">
         <div>
           <div class="flex items-center gap-2">
-            <span class="px-2 py-0.5 rounded-md bg-amber-400/20 text-amber-300 font-mono text-xs font-bold">
+            <span class="px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 font-mono text-xs font-bold border border-amber-200">
               VALUE CHAIN ANALYSIS
             </span>
-            <span class="text-xs text-slate-400">Chapter HS {{ commodity.hs4_code }}</span>
+            <span class="text-xs text-slate-500">Chapter HS {{ commodity.hs4_code }}</span>
           </div>
-          <h3 class="text-xl font-black text-white mt-1">
+          <h3 class="text-xl font-black text-slate-900 mt-1">
             Processing Value Jump: Raw vs Processed
           </h3>
-          <p class="text-xs text-slate-300 mt-0.5">
+          <p class="text-xs text-slate-600 mt-0.5">
             Economic premium gained by domestic value-added processing before export.
           </p>
         </div>
 
-        <div class="px-4 py-2 rounded-xl bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-xs font-extrabold flex items-center gap-2 self-start sm:self-auto">
+        <div class="px-4 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-extrabold flex items-center gap-2 self-start sm:self-auto shadow-2xs">
           <span>⚡ Value Multiplier:</span>
-          <span class="text-sm font-black text-emerald-200">
+          <span class="text-sm font-black text-emerald-700">
             {{ (commodity.raw_vs_processed.proc_price_usd_per_kg / Math.max(0.01, commodity.raw_vs_processed.raw_price_usd_per_kg)).toFixed(1) }}x
           </span>
         </div>
@@ -191,84 +191,84 @@
       <!-- Side-by-side Raw vs Processed Cards -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <!-- Raw Form Card -->
-        <div class="bg-slate-800/80 p-5 rounded-2xl border border-slate-700/80 flex flex-col justify-between">
+        <div class="bg-white p-5 rounded-2xl border border-amber-200/80 shadow-2xs flex flex-col justify-between">
           <div>
             <div class="flex items-center justify-between mb-2">
-              <span class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-700 text-slate-300">
+              <span class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
                 HS {{ commodity.raw_vs_processed.raw_hs8 }}
               </span>
-              <span class="text-xs font-bold text-amber-400 bg-amber-950/60 px-2 py-0.5 rounded">
+              <span class="text-xs font-bold text-amber-800 bg-amber-100 border border-amber-200 px-2 py-0.5 rounded">
                 Raw / Unprocessed
               </span>
             </div>
-            <h4 class="text-base font-bold text-white">{{ commodity.raw_vs_processed.raw_name_en }}</h4>
-            <p class="text-xs text-slate-400 font-sans mt-0.5">{{ commodity.raw_vs_processed.raw_name_km }}</p>
+            <h4 class="text-base font-bold text-slate-900">{{ commodity.raw_vs_processed.raw_name_en }}</h4>
+            <p class="text-xs text-slate-500 font-sans mt-0.5">{{ commodity.raw_vs_processed.raw_name_km }}</p>
 
             <div class="mt-4 space-y-2 text-xs">
-              <div class="flex justify-between py-1 border-b border-slate-700/50">
-                <span class="text-slate-400">Unit Price ($/kg):</span>
-                <strong class="text-amber-300 font-bold">${{ commodity.raw_vs_processed.raw_price_usd_per_kg.toFixed(2) }}/kg</strong>
+              <div class="flex justify-between py-1 border-b border-slate-100">
+                <span class="text-slate-500">Unit Price ($/kg):</span>
+                <strong class="text-amber-700 font-bold">${{ commodity.raw_vs_processed.raw_price_usd_per_kg.toFixed(2) }}/kg</strong>
               </div>
-              <div class="flex justify-between py-1 border-b border-slate-700/50">
-                <span class="text-slate-400">Unit Price (KHR/kg):</span>
-                <strong class="text-slate-200">{{ Math.round(commodity.raw_vs_processed.raw_price_khr_per_kg).toLocaleString() }} ៛/kg</strong>
+              <div class="flex justify-between py-1 border-b border-slate-100">
+                <span class="text-slate-500">Unit Price (KHR/kg):</span>
+                <strong class="text-slate-700">{{ Math.round(commodity.raw_vs_processed.raw_price_khr_per_kg).toLocaleString() }} ៛/kg</strong>
               </div>
-              <div class="flex justify-between py-1 border-b border-slate-700/50">
-                <span class="text-slate-400">Total Volume:</span>
-                <strong class="text-slate-200">{{ formatVolumeKg(commodity.raw_vs_processed.raw_weight_kg) }}</strong>
+              <div class="flex justify-between py-1 border-b border-slate-100">
+                <span class="text-slate-500">Total Volume:</span>
+                <strong class="text-slate-700">{{ formatVolumeKg(commodity.raw_vs_processed.raw_weight_kg) }}</strong>
               </div>
               <div class="flex justify-between py-1">
-                <span class="text-slate-400">Total Export Value:</span>
-                <strong class="text-white font-bold">{{ formatRevenue(commodity.raw_vs_processed.raw_val_usd) }}</strong>
+                <span class="text-slate-500">Total Export Value:</span>
+                <strong class="text-slate-900 font-bold">{{ formatRevenue(commodity.raw_vs_processed.raw_val_usd) }}</strong>
               </div>
             </div>
           </div>
 
           <router-link
             :to="`/commodity/${commodity.raw_vs_processed.raw_hs8}`"
-            class="mt-4 text-center text-xs font-bold text-amber-400 hover:text-amber-300 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 transition-colors"
+            class="mt-4 text-center text-xs font-bold text-amber-800 hover:text-amber-900 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 transition-colors"
           >
             View Raw Commodity Detail →
           </router-link>
         </div>
 
         <!-- Processed Form Card -->
-        <div class="bg-indigo-950/60 p-5 rounded-2xl border border-indigo-700/60 flex flex-col justify-between">
+        <div class="bg-white p-5 rounded-2xl border border-indigo-200/80 shadow-2xs flex flex-col justify-between">
           <div>
             <div class="flex items-center justify-between mb-2">
-              <span class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-indigo-900 text-indigo-200">
+              <span class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">
                 HS {{ commodity.raw_vs_processed.processed_hs8 }}
               </span>
-              <span class="text-xs font-bold text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded">
+              <span class="text-xs font-bold text-emerald-800 bg-emerald-100 border border-emerald-200 px-2 py-0.5 rounded">
                 Processed / Value-Added
               </span>
             </div>
-            <h4 class="text-base font-bold text-white">{{ commodity.raw_vs_processed.processed_name_en }}</h4>
-            <p class="text-xs text-indigo-300 font-sans mt-0.5">{{ commodity.raw_vs_processed.processed_name_km }}</p>
+            <h4 class="text-base font-bold text-slate-900">{{ commodity.raw_vs_processed.processed_name_en }}</h4>
+            <p class="text-xs text-indigo-700 font-sans mt-0.5">{{ commodity.raw_vs_processed.processed_name_km }}</p>
 
             <div class="mt-4 space-y-2 text-xs">
-              <div class="flex justify-between py-1 border-b border-indigo-800/50">
-                <span class="text-slate-400">Unit Price ($/kg):</span>
-                <strong class="text-emerald-400 font-bold">${{ commodity.raw_vs_processed.proc_price_usd_per_kg.toFixed(2) }}/kg</strong>
+              <div class="flex justify-between py-1 border-b border-slate-100">
+                <span class="text-slate-500">Unit Price ($/kg):</span>
+                <strong class="text-emerald-700 font-bold">${{ commodity.raw_vs_processed.proc_price_usd_per_kg.toFixed(2) }}/kg</strong>
               </div>
-              <div class="flex justify-between py-1 border-b border-indigo-800/50">
-                <span class="text-slate-400">Unit Price (KHR/kg):</span>
-                <strong class="text-slate-200">{{ Math.round(commodity.raw_vs_processed.proc_price_khr_per_kg).toLocaleString() }} ៛/kg</strong>
+              <div class="flex justify-between py-1 border-b border-slate-100">
+                <span class="text-slate-500">Unit Price (KHR/kg):</span>
+                <strong class="text-slate-700">{{ Math.round(commodity.raw_vs_processed.proc_price_khr_per_kg).toLocaleString() }} ៛/kg</strong>
               </div>
-              <div class="flex justify-between py-1 border-b border-indigo-800/50">
-                <span class="text-slate-400">Total Volume:</span>
-                <strong class="text-slate-200">{{ formatVolumeKg(commodity.raw_vs_processed.proc_weight_kg) }}</strong>
+              <div class="flex justify-between py-1 border-b border-slate-100">
+                <span class="text-slate-500">Total Volume:</span>
+                <strong class="text-slate-700">{{ formatVolumeKg(commodity.raw_vs_processed.proc_weight_kg) }}</strong>
               </div>
               <div class="flex justify-between py-1">
-                <span class="text-slate-400">Total Export Value:</span>
-                <strong class="text-white font-bold">{{ formatRevenue(commodity.raw_vs_processed.proc_val_usd) }}</strong>
+                <span class="text-slate-500">Total Export Value:</span>
+                <strong class="text-slate-900 font-bold">{{ formatRevenue(commodity.raw_vs_processed.proc_val_usd) }}</strong>
               </div>
             </div>
           </div>
 
           <router-link
             :to="`/commodity/${commodity.raw_vs_processed.processed_hs8}`"
-            class="mt-4 text-center text-xs font-bold text-emerald-400 hover:text-emerald-300 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 transition-colors"
+            class="mt-4 text-center text-xs font-bold text-indigo-800 hover:text-indigo-900 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition-colors"
           >
             View Processed Commodity Detail →
           </router-link>
@@ -277,10 +277,10 @@
     </div>
 
     <!-- Top Export Markets Table -->
-    <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+    <div class="bg-white p-4 sm:p-6 rounded-2xl border border-slate-100 shadow-sm">
       <div class="flex items-center justify-between mb-4">
         <div>
-          <h3 class="text-base font-bold text-slate-900">Destination Markets Breakdown</h3>
+          <h3 class="text-sm sm:text-base font-bold text-slate-900">Destination Markets Breakdown</h3>
           <p class="text-xs text-slate-500 mt-0.5">International buyers ranked by total export revenue and volume</p>
         </div>
         <span class="text-xs font-semibold text-slate-500 bg-slate-50 px-2.5 py-1 rounded-lg">
@@ -288,8 +288,8 @@
         </span>
       </div>
 
-      <div class="overflow-x-auto">
-        <table class="w-full text-left text-xs">
+      <div class="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+        <table class="w-full text-left text-xs whitespace-nowrap">
           <thead class="bg-slate-50 text-slate-600 font-bold uppercase border-b border-slate-200">
             <tr>
               <th class="p-3 w-12 text-center">Rank</th>

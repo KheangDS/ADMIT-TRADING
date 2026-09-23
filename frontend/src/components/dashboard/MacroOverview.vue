@@ -1,16 +1,16 @@
 <template>
-  <div v-if="store.dashboardData" class="space-y-8">
+  <div v-if="store.dashboardData" class="space-y-6 sm:space-y-8">
     
     <!-- Executive Overview Header -->
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-200 gap-3">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-3 sm:pb-4 border-b border-slate-200 gap-2 sm:gap-3">
       <div>
-        <h2 class="text-xl font-black text-slate-900 tracking-tight">Export Analytics Overview</h2>
+        <h2 class="text-lg sm:text-xl font-black text-slate-900 tracking-tight">Export Analytics Overview</h2>
         <p class="text-xs text-slate-500 mt-0.5">High-level Cambodian agricultural trade performance & product-level insights</p>
       </div>
     </div>
 
     <!-- Executive KPI Cards Grid (5 Core Pillars) -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
       <KpiCard
         v-for="kpi in store.dashboardData.summary_kpis"
         :key="kpi.label"
@@ -24,7 +24,7 @@
     <GraphSlicerPanel />
 
     <!-- Executive Charts Grid (Powered by Interactive Chart Customizer) -->
-    <div v-if="store.dashboardData.level1_charts.length > 0" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div v-if="store.dashboardData.level1_charts.length > 0" class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
       <ChartCustomizer
         v-for="chart in store.dashboardData.level1_charts"
         :key="chart.chart_id"
@@ -35,16 +35,16 @@
         :ai-meaning="chart.ai_meaning"
       />
     </div>
-    <div v-else class="bg-white p-10 rounded-2xl border border-slate-200 text-center space-y-2">
+    <div v-else class="bg-white p-6 sm:p-10 rounded-2xl border border-slate-200 text-center space-y-2">
       <h4 class="text-sm font-bold text-slate-700">No Export Charts Available</h4>
       <p class="text-xs text-slate-400">Charts and AI insights will automatically generate once a trade dataset is ingested from the Admin Portal.</p>
     </div>
 
     <!-- HS8 Commodities Summary Data Table -->
-    <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+    <div class="bg-white p-4 sm:p-6 rounded-2xl border border-slate-100 shadow-sm">
       <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-3 mb-3 border-b border-slate-100 gap-2">
         <div>
-          <h3 class="text-base font-bold text-slate-900">Export Summary: HS 8-Digit Commodities</h3>
+          <h3 class="text-sm sm:text-base font-bold text-slate-900">Export Summary: HS 8-Digit Commodities</h3>
           <p class="text-xs text-slate-500">Comprehensive breakdown across active 8-digit tariff line commodities</p>
         </div>
         
@@ -80,8 +80,8 @@
         </div>
       </div>
 
-      <div class="overflow-x-auto">
-        <table class="w-full text-left text-xs">
+      <div class="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+        <table class="w-full text-left text-xs whitespace-nowrap">
           <thead class="bg-slate-50 text-slate-600 font-bold uppercase border-b border-slate-200 text-[11px]">
             <tr>
               <th class="p-3">HS8 Code</th>
@@ -133,48 +133,48 @@
     </div>
 
     <!-- About This Platform: Empowering Agro-SMEs with Trade Intelligence -->
-    <div class="bg-gradient-to-br from-slate-900 via-slate-900 to-sky-950 p-6 md:p-8 rounded-2xl text-white shadow-xl border border-slate-800">
-      <div class="flex items-center gap-2.5 text-sky-400 font-bold text-xs uppercase tracking-wider mb-6">
-        <Sparkles class="w-4 h-4 text-sky-400" />
+    <div class="bg-gradient-to-br from-white via-sky-50/40 to-slate-50 p-4 sm:p-6 md:p-8 rounded-2xl text-slate-900 shadow-sm border border-slate-200/90">
+      <div class="flex items-center gap-2.5 text-sky-700 font-bold text-xs uppercase tracking-wider mb-6">
+        <Sparkles class="w-4 h-4 text-sky-600" />
         <span>About This Platform: Empowering Agro-SMEs with Trade Intelligence</span>
       </div>
       
       <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
         <!-- Pillar 1 -->
-        <div class="bg-slate-800/60 rounded-xl p-5 border border-slate-700/60 flex flex-col justify-start">
+        <div class="bg-white rounded-xl p-5 border border-slate-200/90 shadow-2xs flex flex-col justify-start">
           <div class="flex items-center gap-3 mb-3">
-            <div class="w-8 h-8 rounded-lg bg-sky-500/20 border border-sky-400/30 flex items-center justify-center text-sky-400">
+            <div class="w-9 h-9 rounded-xl bg-sky-50 border border-sky-200 flex items-center justify-center text-sky-600">
               <Globe class="w-4 h-4" />
             </div>
-            <h4 class="font-bold text-sm text-sky-200">Democratizing Trade Intelligence for Local SMEs</h4>
+            <h4 class="font-bold text-sm text-slate-900">Democratizing Trade Intelligence for Local SMEs</h4>
           </div>
-          <p class="text-xs text-slate-300 leading-relaxed text-justify">
+          <p class="text-xs text-slate-600 leading-relaxed text-justify">
             Eliminates trade information asymmetry by equipping Cambodian agricultural SMEs and local producers with direct, institutional-grade visibility into global market demand, buyer destinations, and benchmark export unit prices ($/kg)—intelligence traditionally restricted to large multinational conglomerates.
           </p>
         </div>
 
         <!-- Pillar 2 -->
-        <div class="bg-slate-800/60 rounded-xl p-5 border border-slate-700/60 flex flex-col justify-start">
+        <div class="bg-white rounded-xl p-5 border border-slate-200/90 shadow-2xs flex flex-col justify-start">
           <div class="flex items-center gap-3 mb-3">
-            <div class="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-emerald-400">
+            <div class="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600">
               <TrendingUp class="w-4 h-4" />
             </div>
-            <h4 class="font-bold text-sm text-emerald-200">Actionable Export Strategy & Margin Optimization</h4>
+            <h4 class="font-bold text-sm text-slate-900">Actionable Export Strategy & Margin Optimization</h4>
           </div>
-          <p class="text-xs text-slate-300 leading-relaxed text-justify">
+          <p class="text-xs text-slate-600 leading-relaxed text-justify">
             Empowers agro-exporters to identify high-margin target markets, bypass intermediary markups, and strategically align harvest shipping schedules with seasonal price peaks to maximize export profitability.
           </p>
         </div>
 
         <!-- Pillar 3 -->
-        <div class="bg-slate-800/60 rounded-xl p-5 border border-slate-700/60 flex flex-col justify-start">
+        <div class="bg-white rounded-xl p-5 border border-slate-200/90 shadow-2xs flex flex-col justify-start">
           <div class="flex items-center gap-3 mb-3">
-            <div class="w-8 h-8 rounded-lg bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-400">
+            <div class="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-600">
               <Cpu class="w-4 h-4" />
             </div>
-            <h4 class="font-bold text-sm text-indigo-200">High-Performance Analytics Powered by Grounded AI</h4>
+            <h4 class="font-bold text-sm text-slate-900">High-Performance Analytics Powered by Grounded AI</h4>
           </div>
-          <p class="text-xs text-slate-300 leading-relaxed text-justify">
+          <p class="text-xs text-slate-600 leading-relaxed text-justify">
             Combines a high-performance analytical data engine with grounded conversational AI, allowing business owners and exporters to effortlessly explore complex customs records and uncover trade opportunities through natural language without requiring data science expertise.
           </p>
         </div>

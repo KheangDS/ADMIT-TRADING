@@ -265,3 +265,38 @@ export function getDisplayCountryName(name: string): string {
   return meta.en || name;
 }
 
+/**
+ * Robustly checks if two country identifiers (English, Khmer, ISO, Alias, or GeoJSON name) represent the same country.
+ */
+export function isSameCountry(name1: string, name2: string): boolean {
+  if (!name1 || !name2) return false;
+  const clean1 = name1.replace(/[\u200b\xa0]/g, '').trim();
+  const clean2 = name2.replace(/[\u200b\xa0]/g, '').trim();
+  if (clean1.toLowerCase() === clean2.toLowerCase()) return true;
+
+  const meta1 = getCountryMeta(clean1);
+  const meta2 = getCountryMeta(clean2);
+
+  if (meta1.iso !== 'OTH' && meta2.iso !== 'OTH' && meta1.iso === meta2.iso) {
+    return true;
+  }
+  if (meta1.en && meta2.en && meta1.en.toLowerCase() === meta2.en.toLowerCase()) {
+    return true;
+  }
+  if (meta1.km && meta2.km && meta1.km === meta2.km) {
+    return true;
+  }
+
+  const l1 = clean1.toLowerCase();
+  const l2 = clean2.toLowerCase();
+  const e1 = meta1.en.toLowerCase();
+  const e2 = meta2.en.toLowerCase();
+
+  return l1 === e2 ||
+         l2 === e1 ||
+         clean1 === meta2.km ||
+         clean2 === meta1.km ||
+         (e1.length > 3 && l2.includes(e1)) ||
+         (e2.length > 3 && l1.includes(e2));
+}
+

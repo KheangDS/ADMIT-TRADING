@@ -1,25 +1,27 @@
 <template>
   <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-100 shadow-xs hover:shadow-md hover:border-slate-200/80 transition-all duration-200 flex flex-col justify-between min-h-[116px]">
-    <!-- Card Header: Label & Icon Badge -->
+    <!-- Card Header: Title & Icon Badge -->
     <div class="flex items-center justify-between gap-2 w-full">
-      <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider truncate" :title="label">
-        {{ label }}
-      </span>
+      <div class="min-w-0 flex-1">
+        <span class="text-[11px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider block truncate" :title="description || label">
+          {{ displayTitle }}
+        </span>
+      </div>
       <div 
         class="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 shadow-2xs"
         :class="badgeColorClass"
       >
-        <DollarSignIcon v-if="label.includes('($)') || label.includes('USD')" class="w-4 h-4 text-emerald-600" />
-        <CoinsIcon v-else-if="label.includes('(KHR)') || label.includes('(៛)')" class="w-4 h-4 text-amber-600" />
-        <ScaleIcon v-else-if="label.includes('Volume')" class="w-4 h-4 text-sky-600" />
-        <GlobeIcon v-else-if="label.includes('Market') || label.includes('Countr') || label.includes('Destination')" class="w-4 h-4 text-indigo-600" />
-        <BoxesIcon v-else-if="label.includes('Commodit') || label.includes('HS8') || label.includes('Product')" class="w-4 h-4 text-purple-600" />
+        <DollarSignIcon v-if="isUsd" class="w-4 h-4 text-emerald-600" />
+        <CoinsIcon v-else-if="isKhr" class="w-4 h-4 text-amber-600" />
+        <ScaleIcon v-else-if="isVolume" class="w-4 h-4 text-sky-600" />
+        <GlobeIcon v-else-if="isMarkets" class="w-4 h-4 text-indigo-600" />
+        <BoxesIcon v-else-if="isCommodities" class="w-4 h-4 text-purple-600" />
         <TrendingUpIcon v-else class="w-4 h-4 text-sky-600" />
       </div>
     </div>
     
     <!-- Card Body: Value & Unit Centered -->
-    <div class="my-auto pt-3 pb-1 flex items-center justify-center gap-2 flex-wrap text-center">
+    <div class="my-auto pt-3 pb-1 flex items-baseline justify-center gap-1.5 flex-wrap text-center">
       <span class="text-2xl sm:text-[26px] font-black text-slate-900 tracking-tight leading-none">
         {{ formattedNumber }}
       </span>
@@ -50,13 +52,30 @@ const props = defineProps<{
   description?: string;
 }>();
 
+const isUsd = computed(() => props.label.includes('($)') || props.label.toLowerCase().includes('usd'));
+const isKhr = computed(() => props.label.includes('(KHR)') || props.label.includes('(៛)') || props.label.toLowerCase().includes('khr'));
+const isVolume = computed(() => props.label.toLowerCase().includes('volume') || props.label.toLowerCase().includes('weight'));
+const isMarkets = computed(() => props.label.toLowerCase().includes('market') || props.label.toLowerCase().includes('countr') || props.label.toLowerCase().includes('destination'));
+const isCommodities = computed(() => props.label.toLowerCase().includes('commodit') || props.label.toLowerCase().includes('hs8') || props.label.toLowerCase().includes('product'));
+
+// Concise, human-friendly titles that never truncate awkwardly
+const displayTitle = computed(() => {
+  const lbl = props.label.trim();
+  if (isUsd.value) return 'Revenue (USD)';
+  if (isKhr.value) return 'Revenue (KHR)';
+  if (isVolume.value) return 'Export Volume';
+  if (isMarkets.value) return 'Destination Markets';
+  if (isCommodities.value) return 'Total Commodities';
+  return lbl;
+});
+
 // Dynamic icon background classes
 const badgeColorClass = computed(() => {
-  if (props.label.includes('($)') || props.label.includes('USD')) return 'bg-emerald-50 border border-emerald-100/80';
-  if (props.label.includes('(KHR)') || props.label.includes('(៛)')) return 'bg-amber-50 border border-amber-100/80';
-  if (props.label.includes('Volume')) return 'bg-sky-50 border border-sky-100/80';
-  if (props.label.includes('Market') || props.label.includes('Countr') || props.label.includes('Destination')) return 'bg-indigo-50 border border-indigo-100/80';
-  if (props.label.includes('Commodit') || props.label.includes('HS8') || props.label.includes('Product')) return 'bg-purple-50 border border-purple-100/80';
+  if (isUsd.value) return 'bg-emerald-50 border border-emerald-100/80';
+  if (isKhr.value) return 'bg-amber-50 border border-amber-100/80';
+  if (isVolume.value) return 'bg-sky-50 border border-sky-100/80';
+  if (isMarkets.value) return 'bg-indigo-50 border border-indigo-100/80';
+  if (isCommodities.value) return 'bg-purple-50 border border-purple-100/80';
   return 'bg-slate-50 border border-slate-100';
 });
 
