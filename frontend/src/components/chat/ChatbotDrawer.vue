@@ -167,8 +167,9 @@ const copiedId = ref<string | null>(null);
 
 const quickChips = [
   'Top export commodities by revenue',
-  'Destination market concentration risk',
-  'Raw vs Processed price multiplier'
+  'Destination market concentration',
+  'Monthly export timeline & peak season',
+  'Highest unit price HS8 commodities'
 ];
 
 function scrollToBottom() {
@@ -233,6 +234,33 @@ function renderFormattedResponse(rawText: string): string {
   // 1. Format Section Dividers
   text = text.replace(/^(?:---|___|\*\*\*)\s*$/gm, '<hr class="my-3 border-slate-200" />');
 
+  // 1.5 Format Markdown Tables
+  text = text.replace(/((?:\|[^\n]+\|\r?\n)+)/g, (tableMatch) => {
+    const rows = tableMatch.trim().split('\n').map(r => r.trim()).filter(Boolean);
+    if (rows.length < 2) return tableMatch;
+    let html = '<div class="overflow-x-auto my-2.5 rounded-xl border border-slate-200 shadow-xs"><table class="w-full text-left text-xs border-collapse">';
+    let isHeader = true;
+    for (const row of rows) {
+      if (/^\|[\s\-:|]+\|$/.test(row)) {
+        isHeader = false;
+        continue;
+      }
+      const cells = row.split('|').slice(1, -1).map(c => c.trim());
+      if (isHeader) {
+        html += '<thead class="bg-slate-100 text-slate-700 font-bold uppercase text-[10px] tracking-wider border-b border-slate-200"><tr>';
+        cells.forEach(c => { html += `<th class="py-2 px-3">${c}</th>`; });
+        html += '</tr></thead><tbody>';
+        isHeader = false;
+      } else {
+        html += '<tr class="border-b border-slate-100 hover:bg-slate-50 transition-colors">';
+        cells.forEach(c => { html += `<td class="py-2 px-3 text-slate-700">${c}</td>`; });
+        html += '</tr>';
+      }
+    }
+    html += '</tbody></table></div>';
+    return html;
+  });
+
   // 2. Format Headings (### 1. Key Insights -> Styled Badge Heading)
   text = text.replace(/^###\s*(?:(\d+)\.\s*)?([^\n]+)/gm, (_match, num, title) => {
     const numBadge = num
@@ -283,6 +311,7 @@ function renderFormattedResponse(rawText: string): string {
       const trimmed = p.trim();
       if (
         trimmed.startsWith('<div class="flex') ||
+        trimmed.startsWith('<div class="overflow-x-auto') ||
         trimmed.startsWith('<hr') ||
         trimmed.startsWith('<h4')
       ) {

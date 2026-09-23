@@ -6,6 +6,8 @@ import time
 import requests
 from typing import Dict, Any, List, Optional
 
+from app.services.hs_product_service import get_hs4_official_name, clean_hs_code
+
 try:
     from app.config import settings
     DEFAULT_API_KEY = settings.GEMINI_API_KEY
@@ -13,15 +15,6 @@ try:
 except Exception:
     DEFAULT_API_KEY = ""
     STORAGE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "storage")
-
-# Standard English dictionary for HS4 Chapters to guarantee clean presentation
-HS4_TITLES = {
-    '0801': 'Cashew Nuts & Coconuts',
-    '0804': 'Fresh & Dried Mangoes',
-    '0904': 'Pepper & Capsicum (Chili)',
-    '0910': 'Ginger, Turmeric & Spices',
-    '1211': 'Medicinal & Perfumery Plants'
-}
 
 class AIService:
     def __init__(self):
@@ -72,20 +65,15 @@ class AIService:
             print(f"[AI Service] Warning saving cache: {e}")
 
     def _clean_chapter_title(self, cat: Dict[str, Any]) -> str:
-        code = str(cat.get("hs4_code", "")).zfill(4)
-        if code in HS4_TITLES:
-            return f"{HS4_TITLES[code]} (HS {code})"
-        title = cat.get("title_en") or cat.get("official_title") or cat.get("hs4_desc") or f"Chapter {code}"
-        # If title is heavily non-ascii or raw customs line, clean it
-        if len(title) > 40:
-            title = title[:40] + "..."
+        code = clean_hs_code(cat.get("hs4_code", ""), 4)
+        t_en, _, _, _ = get_hs4_official_name(code, cat.get("hs4_desc", ""))
+        title = cat.get("title_en") or cat.get("official_title") or t_en or f"Chapter {code}"
         return f"{title} (HS {code})"
 
     def _compute_data_hash(self, metrics: Dict[str, Any]) -> str:
         """Computes a deterministic hash fingerprint representing the dataset content."""
         total_usd = round(float(metrics.get("total_val_usd", 0)), 2)
         total_ton = round(float(metrics.get("total_weight_ton", 0)), 2)
-        hhi = round(float(metrics.get("hhi_score", 0)), 2)
         begin_date = str(metrics.get("begin_date", ""))
         end_date = str(metrics.get("end_date", ""))
         
@@ -108,7 +96,6 @@ class AIService:
         fingerprint_data = {
             "total_usd": total_usd,
             "total_ton": total_ton,
-            "hhi": hhi,
             "begin_date": begin_date,
             "end_date": end_date,
             "hs4": hs4_items,
@@ -121,7 +108,6 @@ class AIService:
     def _call_gemini_api(self, prompt: str, is_json: bool = False) -> Optional[str]:
         """Calls Google Gemini API via REST with automatic fallback through model candidates."""
         if not self.api_key:
-            print("[AI Service] No GEMINI_API_KEY configured.")
             return None
 
         for model in self.model_candidates:
@@ -134,7 +120,6 @@ class AIService:
                     "response_mime_type": "application/json"
                 }
 
-            # Try request with 1 immediate retry on 503
             for attempt in range(2):
                 try:
                     res = requests.post(url, json=payload, timeout=20)
@@ -144,15 +129,12 @@ class AIService:
                         if parts and "text" in parts[0]:
                             return parts[0]["text"].strip()
                     elif res.status_code == 503:
-                        print(f"[AI Service] Model {model} 503 (busy). Attempt {attempt + 1}/2...")
                         if attempt == 0:
                             time.sleep(0.5)
                             continue
                     else:
-                        print(f"[AI Service] Gemini model {model} returned status {res.status_code}: {res.text[:120]}")
                         break
-                except Exception as e:
-                    print(f"[AI Service] Error contacting Gemini model {model}: {e}")
+                except Exception:
                     break
 
         return None
@@ -164,96 +146,136 @@ class AIService:
         """
         data_hash = self._compute_data_hash(metrics)
 
-        # 1. Check persistent cache: If same data, return consistent cached answer immediately!
+        # 1. Check persistent cache
         if data_hash in self._cache:
             cached_data = self._cache[data_hash]
-            required_keys = ["commodity_bar_meaning", "country_donut_meaning", "price_jump_meaning", "seasonality_line_meaning", "executive_strategy"]
+            required_keys = ["commodity_bar_meaning", "country_donut_meaning", "market_share_table_meaning", "seasonality_line_meaning", "executive_strategy"]
             if all(k in cached_data for k in required_keys):
-                print(f"[AI Service] Cache HIT (hash {data_hash[:8]}). Returning consistent cached AI insights.")
                 return cached_data
-
-        print(f"[AI Service] Cache MISS (hash {data_hash[:8]}). Generating fresh insights with Gemini LLM API...")
 
         # 2. Prepare structured data summary for LLM prompt
         total_usd = metrics.get('total_val_usd', 0)
         total_weight = metrics.get('total_weight_ton', 0)
         avg_price = metrics.get('overall_avg_price_usd_per_kg', 0)
-        hhi = metrics.get('hhi_score', 0)
-        hs4_list = metrics.get('hs4_summary', [])
+        begin_date = metrics.get('begin_date', 'N/A')
+        end_date = metrics.get('end_date', 'N/A')
+        hs8_list = metrics.get('hs8_commodities', metrics.get('hs8_summary', metrics.get('hs4_summary', [])))
         country_list = metrics.get('country_summary', [])
+        monthly_list = metrics.get('monthly_summary', [])
 
-        hs4_text_summary = []
-        for cat in hs4_list:
-            clean_title = self._clean_chapter_title(cat)
-            val = cat.get('val_usd', 0)
-            share = cat.get('revenue_share_pct', 0)
-            weight = cat.get('weight_ton', cat.get('weight_tonnes', 0))
-            price = cat.get('unit_price_usd_per_kg', 0)
-            hs4_text_summary.append(f"- {clean_title}: ${val/1e6:.2f}M USD ({share:.1f}% share), {weight:,.1f} Tonnes, ${price:.2f}/kg")
-            hs4_text_summary.append(f"- {clean_title}: ${val/1e6:.2f}M USD ({share:.1f}% share), {weight:,.1f} Tonnes")
+        # Chart 1 Data: Top HS8 Commodities (Donut Chart)
+        hs8_chart_summary = []
+        for item in hs8_list[:8]:
+            code = item.get('hs8_code') or item.get('hs4_code', '')
+            name = item.get('name_en') or item.get('product_name') or f"HS {code}"
+            val = item.get('val_usd', 0)
+            share_rev = item.get('revenue_share_pct', (val / max(1.0, total_usd)) * 100.0)
+            weight = item.get('weight_ton', item.get('weight_tonnes', 0))
+            price_kg = item.get('unit_price_usd_per_kg', 0)
+            hs8_chart_summary.append(
+                f"- {name} (HS {code}): ${val/1e6:.2f}M USD ({share_rev:.1f}% revenue share), {weight:,.1f} Tonnes, Unit Price = ${price_kg:.2f}/kg"
+            )
 
-        top_dest_summary = []
+        # Chart 2 Data: Destination Countries Ranking (Horizontal Bar Chart)
+        country_chart_summary = []
         for c in country_list[:6]:
             val = c.get('val_usd', 0)
             share = (val / max(1.0, total_usd)) * 100.0
-            top_dest_summary.append(f"- {c.get('country')}: ${val/1e6:.2f}M USD ({share:.1f}% share)")
+            weight = c.get('weight_ton', c.get('weight_tonnes', 0))
+            cname = c.get('country_en') or c.get('country')
+            country_chart_summary.append(
+                f"- {cname}: ${val/1e6:.2f}M USD ({share:.1f}% revenue share), {weight:,.1f} Tonnes"
+            )
+
+        # Chart 3 Data: Top 10 Destination Market Share Table
+        table_chart_summary = []
+        for idx, c in enumerate(country_list[:10], 1):
+            val = c.get('val_usd', 0)
+            rev_share = (val / max(1.0, total_usd)) * 100.0
+            weight = c.get('weight_ton', c.get('weight_tonnes', 0))
+            vol_share = (weight / max(0.001, total_weight)) * 100.0
+            cname = c.get('country_en') or c.get('country')
+            table_chart_summary.append(
+                f"#{idx} {cname}: Volume = {weight:,.1f} Tonnes ({vol_share:.1f}%), Revenue = ${val/1e6:.2f}M USD ({rev_share:.1f}%)"
+            )
+
+        # Chart 4 Data: Monthly Export Trajectory Timeline (Line Chart)
+        monthly_chart_summary = []
+        peak_month = max(monthly_list, key=lambda x: x.get('val_usd', 0)) if monthly_list else {}
+        low_month = min(monthly_list, key=lambda x: x.get('val_usd', 0)) if monthly_list else {}
+        for m in monthly_list:
+            ym = m.get('yyyy_mm', '')
+            val = m.get('val_usd', 0)
+            weight = m.get('weight_ton', m.get('weight_kg', 0) / 1000.0)
+            monthly_chart_summary.append(f"- {ym}: ${val/1e6:.2f}M USD ({weight:,.1f} Tonnes)")
 
         prompt = f"""
-You are a senior agricultural economist and trade intelligence analyst for Cambodia.
-Based strictly on the trade dataset metrics provided below, generate clear, professional, executive-level insights for the 4 dashboard charts and the overall executive strategy.
+You are a senior agricultural trade intelligence analyst for Cambodia.
+Based strictly on the concrete data points of the 4 dashboard charts provided below, generate accurate, professional, executive-level insights for each chart and an overall strategy.
 
-DATASET METRICS:
-- Total Export Value: ${total_usd/1e6:.2f} Million USD (${total_usd:,.0f} USD)
-- Total Export Volume: {total_weight:,.1f} Tonnes
-- Overall Average Price: ${avg_price:.2f} / kg
-- Market Concentration HHI: {hhi:,.0f} (High risk if > 2,500)
+REPORTING PERIOD: {begin_date} to {end_date}
+TOTAL EXPORT VALUE: ${total_usd/1e6:.2f} Million USD (${total_usd:,.0f} USD)
+TOTAL EXPORT VOLUME: {total_weight:,.1f} Tonnes
+AVERAGE UNIT PRICE: ${avg_price:.2f}/kg
 
-MAJOR COMMODITY CHAPTERS:
-{chr(10).join(hs4_text_summary)}
+=======================================================
+[CHART 1] COMMODITIES EXPORT SHARE (DONUT CHART)
+Top commodities by export value and volume:
+{chr(10).join(hs8_chart_summary)}
 
-TOP DESTINATION MARKETS:
-{chr(10).join(top_dest_summary)}
+=======================================================
+[CHART 2] TOP DESTINATION COUNTRIES REVENUE (HORIZONTAL BAR CHART)
+Ranking of destination partner countries:
+{chr(10).join(country_chart_summary)}
 
-RAW VS PROCESSED VALUE MULTIPLIERS:
-- Cashew: Raw in-shell (HS 08013100) exports at ~$1.23/kg whereas processed shelled cashew kernels (HS 08013200) export at ~$6.12/kg (5.0x value addition).
-- Pepper: Raw uncrushed pepper (HS 09041110) exports at ~$4.10/kg whereas processed crushed/ground pepper (HS 09041210) exports at ~$9.85/kg (2.4x value addition).
+=======================================================
+[CHART 3] TOP 10 DESTINATION MARKET SHARE SUMMARY (TABLE)
+Top destination markets by volume and value breakdown:
+{chr(10).join(table_chart_summary)}
 
-MONTHLY SEASONALITY:
-- Q1 harvest peak (February to April) accounts for high volume surges, followed by supply tightening and off-season price adjustments in Q3/Q4.
+=======================================================
+[CHART 4] MONTHLY EXPORT TRAJECTORY (LINE CHART)
+Monthly timeline dynamic:
+- Peak export month: {peak_month.get('yyyy_mm', 'N/A')} (${peak_month.get('val_usd', 0)/1e6:.2f}M USD, {peak_month.get('weight_ton', 0):,.1f} Tonnes)
+- Lowest export month: {low_month.get('yyyy_mm', 'N/A')} (${low_month.get('val_usd', 0)/1e6:.2f}M USD, {low_month.get('weight_ton', 0):,.1f} Tonnes)
+Monthly points:
+{chr(10).join(monthly_chart_summary)}
+=======================================================
 
 Respond ONLY with valid JSON in this exact structure:
 {{
   "commodity_bar_meaning": {{
-    "explanation": "1 sentence describing what this commodity chapter breakdown chart shows.",
-    "key_takeaway": "1 sentence with exact data points highlighting the dominant crop chapter and secondary contributors.",
-    "action": "1 actionable policy or investment recommendation to expand value retention."
+    "explanation": "1 concise sentence explaining what this Donut Chart displays.",
+    "key_takeaway": "1 sentence citing exact top commodity names and percentages from Chart 1 data above.",
+    "action": "1 actionable recommendation to enhance domestic processing and value addition for dominant crops."
   }},
   "country_donut_meaning": {{
-    "explanation": "1 sentence describing what this destination country market concentration chart shows.",
-    "key_takeaway": "1 sentence summarizing the concentration risk (HHI score) and top buyer nations.",
-    "action": "1 actionable strategic recommendation for export market diversification."
+    "explanation": "1 concise sentence explaining what this Horizontal Bar Chart displays.",
+    "key_takeaway": "1 sentence summarizing top buyer nations and their revenue shares from Chart 2 data above (do NOT mention HHI).",
+    "action": "1 actionable recommendation for export market diversification."
   }},
-  "price_jump_meaning": {{
-    "explanation": "1 sentence describing what this raw vs processed value-addition chart compares.",
-    "key_takeaway": "1 sentence highlighting the specific price multiplier captured by domestic processing (e.g. 5x on cashew).",
-    "action": "1 strategic policy action to incentivize local agro-processing factories."
+  "market_share_table_meaning": {{
+    "explanation": "1 concise sentence explaining what this Top 10 destination market summary table outlines.",
+    "key_takeaway": "1 sentence citing exact table figures from Chart 3 data (e.g. top partner shares).",
+    "action": "1 policy recommendation to expand direct market access beyond regional intermediaries."
   }},
   "seasonality_line_meaning": {{
-    "explanation": "1 sentence describing what this monthly volume vs value timeline chart tracks.",
-    "key_takeaway": "1 sentence identifying peak harvest months and seasonal volume fluctuations.",
-    "action": "1 actionable logistics/infrastructure recommendation (e.g. cold storage, warehousing) to stabilize prices."
+    "explanation": "1 concise sentence explaining what this Monthly Timeline Line Chart tracks.",
+    "key_takeaway": "1 sentence citing the peak month and seasonal volume trends from Chart 4 data above.",
+    "action": "1 logistics/infrastructure recommendation (e.g. cold storage, warehousing) to stabilize seasonal volatility."
   }},
   "executive_strategy": [
-    "Strategic priority 1 (Value-added processing)...",
+    "Strategic priority 1 (Commodity value-addition)...",
     "Strategic priority 2 (Destination diversification)...",
     "Strategic priority 3 (Post-harvest logistics & cold-chain)..."
   ]
 }}
 
 FORMATTING CONSTRAINTS:
-1. Always use clean, professional English commodity names (e.g., 'Cashew Nuts & Coconuts (HS 0801)', 'Fresh & Dried Mangoes (HS 0804)', 'Pepper & Capsicum (HS 0904)'). NEVER output raw untranslated customs strings.
-2. Keep each field concise and high-impact.
-3. Output pure JSON without markdown code fences.
+1. Ground all numbers strictly in the concrete data points provided above. Do not invent metrics.
+2. Always use clean, professional English commodity and country names.
+3. For the destination country chart (country_donut_meaning), do NOT mention 'HHI' or 'Herfindahl-Hirschman Index' in key_takeaway; cite partner country shares directly.
+4. Output pure JSON without markdown code fences.
 """
 
         response_text = self._call_gemini_api(prompt, is_json=True)
@@ -263,44 +285,61 @@ FORMATTING CONSTRAINTS:
                 clean_json = re.sub(r"```$", "", clean_json, flags=re.MULTILINE).strip()
                 parsed = json.loads(clean_json)
                 
-                required_keys = ["commodity_bar_meaning", "country_donut_meaning", "price_jump_meaning", "seasonality_line_meaning", "executive_strategy"]
+                if "market_share_table_meaning" in parsed and "price_jump_meaning" not in parsed:
+                    parsed["price_jump_meaning"] = parsed["market_share_table_meaning"]
+                if "price_jump_meaning" in parsed and "market_share_table_meaning" not in parsed:
+                    parsed["market_share_table_meaning"] = parsed["price_jump_meaning"]
+
+                required_keys = ["commodity_bar_meaning", "country_donut_meaning", "market_share_table_meaning", "seasonality_line_meaning", "executive_strategy"]
                 if all(k in parsed for k in required_keys):
                     self._cache[data_hash] = parsed
                     self._save_cache()
-                    print(f"[AI Service] Successfully generated and cached AI insights for data hash {data_hash[:8]}.")
                     return parsed
             except Exception as e:
-                print(f"[AI Service] Error parsing Gemini JSON response: {e}, raw: {response_text[:150]}")
+                print(f"[AI Service] Error parsing Gemini JSON response: {e}")
 
-        # High-Quality Context-Aware Fallback
-        top_crop = self._clean_chapter_title(hs4_list[0]) if len(hs4_list) > 0 else 'Cashew Nuts & Coconuts (HS 0801)'
-        top_crop_share = hs4_list[0].get('revenue_share_pct', 74.3) if len(hs4_list) > 0 else 74.3
-        top_country = country_list[0].get('country', 'Vietnam') if len(country_list) > 0 else 'Vietnam'
+        # High-Quality Dynamic Fallback (No Hardcoded Numbers, No HHI)
+        top_crop = hs8_list[0].get('name_en') if len(hs8_list) > 0 else 'Primary Commodity'
+        top_crop_val = hs8_list[0].get('val_usd', 0) if len(hs8_list) > 0 else total_usd
+        top_crop_share = (top_crop_val / max(0.001, total_usd)) * 100.0
         
+        top1_country = country_list[0].get('country_en', country_list[0].get('country', 'Primary Destination')) if len(country_list) > 0 else 'Primary Destination'
+        top1_val = country_list[0].get('val_usd', 0) if len(country_list) > 0 else total_usd
+        top1_share = (top1_val / max(0.001, total_usd)) * 100.0
+        top2_share = (sum(c.get('val_usd', 0) for c in country_list[:2]) / max(0.001, total_usd)) * 100.0 if len(country_list) > 1 else top1_share
+
+        peak_month_str = peak_month.get('yyyy_mm', 'peak harvest season')
+        peak_month_val = peak_month.get('val_usd', 0)
+
         fallback_insights = {
             'commodity_bar_meaning': {
-                'explanation': 'This bar chart displays the total export revenue and volume distribution across major 4-digit agricultural commodity chapters.',
-                'key_takeaway': f'{top_crop} serves as the primary export revenue engine, generating {top_crop_share:.1f}% of total agricultural trade value (${(total_usd*top_crop_share/100)/1e6:.1f}M USD).',
-                'action': 'Prioritize targeted fiscal incentives and industrial zone infrastructure for domestic value-addition processing.'
+                'explanation': 'This donut chart displays the export volume and revenue contribution across major 8-digit HS8 agricultural commodities.',
+                'key_takeaway': f'{top_crop} serves as the primary export revenue engine, generating {top_crop_share:.1f}% (${top_crop_val/1e6:.2f}M USD) of total agricultural export value.',
+                'action': 'Prioritize targeted infrastructure and domestic value addition to maximize processing margins for top-tier commodity crops.'
             },
             'country_donut_meaning': {
-                'explanation': 'This donut chart visualizes export market concentration across international destination countries.',
-                'key_takeaway': f'Market concentration score (HHI = {hhi:,.0f}) reflects elevated concentration risk, with {top_country} serving as the lead buyer.',
+                'explanation': 'This horizontal bar chart displays export revenue ranking across international destination partner countries.',
+                'key_takeaway': f'{top1_country} leads as the top buyer absorbing {top1_share:.1f}% (${top1_val/1e6:.2f}M USD), with the top two destination partners capturing {top2_share:.1f}% of total trade value.',
                 'action': 'Establish direct bilateral trade agreements and cold-chain shipping corridors to diversify into high-value consumer markets.'
             },
+            'market_share_table_meaning': {
+                'explanation': 'This table summarizes market share across top destination countries by export volume and revenue.',
+                'key_takeaway': f'The top two partner markets absorb {top2_share:.1f}% of total exported agricultural volume and revenue.',
+                'action': 'Expand direct market linkages with international buyers to capture higher export margins and reduce reliance on border transit hubs.'
+            },
             'price_jump_meaning': {
-                'explanation': 'This side-by-side comparison illustrates the unit export price difference between raw commodities and processed products.',
-                'key_takeaway': 'Processing raw commodities (such as shelling raw cashews or processing spices) unlocks a 2.4x to 5.0x increase in unit export value.',
-                'action': 'Incentivize local agro-processing factories to capture higher value domestically rather than exporting raw unprocessed crops.'
+                'explanation': 'This table summarizes market share across top destination countries by export volume and revenue.',
+                'key_takeaway': f'The top two partner markets absorb {top2_share:.1f}% of total exported agricultural volume and revenue.',
+                'action': 'Expand direct market linkages with international buyers to capture higher export margins and reduce reliance on border transit hubs.'
             },
             'seasonality_line_meaning': {
-                'explanation': 'This dual-axis line chart tracks monthly export volume (tonnes) against export revenue ($USD) across the trade timeline.',
-                'key_takeaway': 'Peak export volumes surge during the Q1 harvest cycle (February to April), followed by lower seasonal export volumes in Q3.',
+                'explanation': 'This line chart tracks monthly export trajectory across the trade reporting timeline.',
+                'key_takeaway': f'Monthly export value peaked at ${peak_month_val/1e6:.2f}M USD in {peak_month_str}, showing pronounced seasonal harvest dynamics.',
                 'action': 'Expand post-harvest cold-storage and warehouse warrant systems to stagger supply and capture premium off-season unit prices.'
             },
             'executive_strategy': [
-                f'Accelerate domestic agro-processing capacity for {top_crop} to retain the 5.0x processing value multiplier domestically.',
-                f'Diversify international trade destinations beyond {top_country} by securing direct phytosanitary trade protocols with regional and global markets.',
+                f'Accelerate domestic agro-processing capacity for {top_crop} to capture higher processing margins domestically.',
+                f'Diversify international trade destinations beyond {top1_country} by securing direct phytosanitary trade protocols with regional and global markets.',
                 'Invest in temperature-controlled warehousing and logistical infrastructure to smooth out post-harvest price volatility.'
             ]
         }
@@ -310,206 +349,208 @@ FORMATTING CONSTRAINTS:
         return fallback_insights
 
     def answer_dataset_question(self, session_id: str, question: str, metrics: Dict[str, Any], duckdb_results: List[Dict[str, Any]]) -> str:
-        """Answers user Q&A strictly grounded in the dataset metrics using Gemini LLM with rich fallback synthesis."""
-        rate = metrics.get('exchange_rate_khr_usd', 4070)
+        """Answers user Q&A strictly grounded in the dataset metrics using Gemini LLM with rich dynamic synthesis."""
+        rate = metrics.get('exchange_rate_khr_usd', 4000)
         total_usd = metrics.get('total_val_usd', 0)
         if not total_usd and 'total_val_khr' in metrics:
             total_usd = metrics['total_val_khr'] / max(1.0, rate)
             
         total_weight = metrics.get('total_weight_ton', 0)
-        avg_price = metrics.get('overall_avg_price_usd_per_kg', 0)
-        hhi = metrics.get('hhi_score', 0)
         if not total_weight and 'total_weight_kg' in metrics:
             total_weight = metrics['total_weight_kg'] / 1000.0
             
-        hhi = metrics.get('hhi_score', metrics.get('hhi', metrics.get('hhi_risk_score', 0)))
-        hs4_list = metrics.get('hs4_summary', [])
-        hs8_list = metrics.get('hs8_summary', [])
+        hs8_list = metrics.get('hs8_commodities', metrics.get('hs8_summary', metrics.get('hs4_summary', [])))
         country_list = metrics.get('country_summary', [])
+        monthly_list = metrics.get('monthly_summary', [])
         
         q_clean = question.strip().lower()
         if q_clean in ['hi', 'hii', 'hiii', 'hello', 'hey', 'good morning', 'good afternoon', 'greetings']:
             return "Hello! 👋 I'm your AI Agricultural Trade Assistant. I'm ready to help you analyze your trade dataset. What would you like to know?"
-            
-        hs_match = re.search(r'\b(0\d{3}|\d{4})\b', question)
-        target_hs4 = hs_match.group(1) if hs_match else None
+
+        # Identify query intent
+        is_chart_inquiry = any(w in q_clean for w in [
+            "chart", "visual context:", "explain the key data insights", "donut", "bar chart", 
+            "line chart", "market share table", "overview graph"
+        ])
         
-        context_summary = f"""
-        DATASET OVERALL METRICS:
-        - Total Export Value: ${total_usd/1e6:.2f} Million USD (${total_usd:,.0f} USD)
-        - Total Export Volume: {total_weight:,.2f} Tonnes
-        - Overall Average Unit Price: ${avg_price:.2f} / kg
-        - Market Concentration (HHI Score): {hhi:.0f}
+        is_comparison = any(w in f" {q_clean} " for w in [
+            " vs ", " versus ", "compare ", "comparison ", "difference between "
+        ])
         
-        MAJOR 4-DIGIT COMMODITY CHAPTERS:
-        MAJOR 4-DIGIT COMMODITY CHAPTERS (Aggregated Volumes & Values):
-        """
-        for cat in hs4_list[:5]:
-            weight = cat.get('weight_ton', cat.get('weight_tonnes', 0))
-            clean_title = self._clean_chapter_title(cat)
-            context_summary += f"\n- {clean_title}: ${cat['val_usd']/1e6:.2f}M USD ({cat['revenue_share_pct']:.1f}% share), Volume: {weight:,.2f} Tonnes, Price: ${cat['unit_price_usd_per_kg']:.2f}/kg"
-            context_summary += f"\n- {clean_title}: ${cat['val_usd']/1e6:.2f}M USD ({cat['revenue_share_pct']:.1f}% share), Volume: {weight:,.2f} Tonnes"
+        is_list_request = any(w in q_clean for w in [
+            "list", "breakdown", "break down", "show all", "all commodities", "all products", 
+            "all countries", "itemized", "table of", "every", "by country", "by month", 
+            "by product", "by commodity", "by tariff", "details", "current"
+        ])
+        
+        is_single_metric = any(w in q_clean for w in [
+            "total", "volume", "revenue", "value", "worth", "val", "how much", "how many", 
+            "amount", "quantity", "sum", "overall", "unit price", "price", "average price", 
+            "avg price", "share", "percentage", "pct", "weight", "tonnes", "tons", "kg", 
+            "only want", "just want", "only the", "what is the", "tell me the"
+        ]) and not is_list_request and not is_chart_inquiry
 
-        if country_list:
-            context_summary += "\n\nDESTINATION COUNTRIES (TOP BUYER MARKETS):\n"
-            for c in country_list[:10]:
-                val = c.get('val_usd', 0)
-                share = (val / max(1.0, total_usd)) * 100.0
-                w = c.get('weight_ton', c.get('weight_tonnes', 0))
-                price = c.get('unit_price_usd_per_kg', 0)
-                context_summary += f"- {c.get('country')}: Value = ${val/1e6:.2f}M USD ({share:.1f}% share), Volume = {w:,.1f} Tonnes, Price = ${price:.2f}/kg\n"
-                context_summary += f"- {c.get('country')}: Value = ${val/1e6:.2f}M USD ({share:.1f}% share), Volume = {w:,.1f} Tonnes\n"
-
-        context_summary += "\n\nVALUE-ADDED PROCESSING MULTIPLIERS:\n"
-        context_summary += "\n\nVALUE-ADDED PROCESSING MULTIPLIERS (8-DIGIT HS8 SPECIFIC):\n"
-        context_summary += "- Cashew: Raw In-Shell (HS 08013100) @ $1.23/kg vs Processed Shelled Kernel (HS 08013200) @ $6.12/kg (5.0x price jump)\n"
-        context_summary += "- Mango: Fresh Mangoes (HS 08045021) @ $0.28/kg vs Dried Mangoes (HS 08045022) @ $3.79/kg (13.5x price jump)\n"
-        context_summary += "- Pepper: Raw Pepper (HS 09041110) @ $4.10/kg vs Processed Pepper (HS 09041210) @ $9.85/kg (2.4x price jump)\n"
-
-        if target_hs4:
-            subprods = [sp for sp in hs8_list if str(sp.get('hs4_code')) == target_hs4]
-            context_summary += f"\n\n8-DIGIT SUB-PRODUCTS BREAKDOWN FOR HS {target_hs4} ({len(subprods)} sub-products):\n"
-            context_summary += f"\n\n8-DIGIT SUB-PRODUCTS BREAKDOWN FOR HS {target_hs4} ({len(subprods)} sub-products with exact unit prices):\n"
-            for sp in subprods:
-                w = sp.get('weight_ton', sp.get('weight_tonnes', 0))
-                p = sp.get('unit_price_usd_per_kg', 0)
-                name = sp.get('name_en') or sp.get('product_name') or sp.get('hs8_desc')
-                context_summary += f"- HS8 {sp['hs8_code']} ({name}): Volume = {w:,.2f} Tonnes, Value = ${sp['val_usd']:,.2f} USD, Price = ${p:.2f}/kg\n"
-                context_summary += f"- HS8 {sp['hs8_code']} ({name}): Volume = {w:,.2f} Tonnes, Value = ${sp['val_usd']:,.2f} USD, Unit Price = ${p:.2f}/kg\n"
-        else:
-            context_summary += f"\n\nTOP 8-DIGIT SUB-PRODUCTS ACROSS ALL CHAPTERS:\n"
-            for sp in hs8_list[:8]:
-                w = sp.get('weight_ton', sp.get('weight_tonnes', 0))
-                p = sp.get('unit_price_usd_per_kg', 0)
-                name = sp.get('name_en') or sp.get('product_name') or sp.get('hs8_desc')
-                context_summary += f"- HS8 {sp['hs8_code']} (HS4 {sp['hs4_code']} - {name}): Volume = {w:,.2f} Tonnes, Value = ${sp['val_usd']/1e6:.2f}M USD, Price = ${p:.2f}/kg\n"
-                context_summary += f"- HS8 {sp['hs8_code']} (HS4 {sp['hs4_code']} - {name}): Volume = {w:,.2f} Tonnes, Value = ${sp['val_usd']/1e6:.2f}M USD, Unit Price = ${p:.2f}/kg\n"
-
+        # Build focused, noise-free context
+        context_parts = []
+        
+        # 1. Exact DuckDB query result is primary truth
         if duckdb_results:
-            context_summary += f"\n\nEXACT DUCKDB QUERY RESULTS ({len(duckdb_results)} rows):\n" + json.dumps(duckdb_results[:12], indent=2, default=str)
+            context_parts.append(f"EXACT DUCKDB QUERY RESULT:\n{json.dumps(duckdb_results, indent=2, default=str)}")
+        
+        # 2. Add minimal macro context
+        context_parts.append(f"DATASET TOTALS: Total Export Revenue = ${total_usd/1e6:.2f}M USD (${total_usd:,.0f} USD), Total Export Volume = {total_weight:,.2f} Tonnes, Overall Average Price = ${metrics.get('overall_avg_price_usd_per_kg', 0):.2f}/kg")
+
+        # 3. If chart inquiry, provide structured chart components
+        if is_chart_inquiry:
+            if any(w in q_clean for w in ["commodity", "donut", "share"]):
+                context_parts.append(f"TOP COMMODITIES:\n" + "\n".join([
+                    f"- {c.get('name_en') or c.get('product_name')}: ${c.get('val_usd',0)/1e6:.2f}M USD, {c.get('weight_ton',0):,.1f} Tonnes, ${c.get('unit_price_usd_per_kg',0):.2f}/kg"
+                    for c in hs8_list[:8]
+                ]))
+            elif any(w in q_clean for w in ["country", "destination", "market", "bar"]):
+                context_parts.append(f"TOP BUYER COUNTRIES:\n" + "\n".join([
+                    f"- {c.get('country_en') or c.get('country')}: ${c.get('val_usd',0)/1e6:.2f}M USD ({(c.get('val_usd',0)/max(1.0, total_usd))*100:.1f}%), {c.get('weight_ton',0):,.1f} Tonnes"
+                    for c in country_list[:8]
+                ]))
+            elif any(w in q_clean for w in ["month", "timeline", "season", "trend"]):
+                context_parts.append(f"MONTHLY TIMELINE:\n" + "\n".join([
+                    f"- {m.get('yyyy_mm')}: ${m.get('val_usd',0)/1e6:.2f}M USD, {m.get('weight_ton',0):,.1f} Tonnes"
+                    for m in monthly_list
+                ]))
+
+        context_summary = "\n\n".join(context_parts)
+
+        # Precise Mode Prompt Instructions
+        if is_single_metric:
+            rules = """
+CRITICAL DIRECT SINGLE-METRIC RULES:
+1. Answer ONLY what the user asked for.
+2. Provide the direct headline metric in ONE single, concise, authoritative sentence (e.g., "The total export volume of Pepper commodities is 6,017.83 Tonnes.").
+3. Do NOT list sub-products, chapters, or itemized breakdowns.
+4. Do NOT mention unrelated crops, other chapter products, or unrequested countries.
+5. Do NOT include disclaimers, notes, or macroeconomic recommendations.
+6. NEVER include persona introductions (DO NOT say "As a Senior Analyst...").
+7. Ground your numbers strictly in the exact DuckDB Query Result provided above.
+"""
+        elif is_comparison:
+            rules = """
+CRITICAL COMPARISON RULES:
+1. Compare ONLY the specific requested entities directly and concisely.
+2. Provide a 2-sentence summary comparing Volume (Tonnes), Value ($ USD), and Unit Price ($/kg) for each entity based on the DuckDB query results.
+3. NEVER include persona introductions or filler openers.
+4. Do NOT mention unrelated commodities or countries.
+"""
+        elif is_chart_inquiry:
+            rules = """
+CRITICAL CHART INSIGHT RULES:
+1. Explain ONLY the data patterns, numbers, rankings, and visual comparisons shown in that specific chart.
+2. Structure chart response clearly:
+   ### 1. Chart Summary
+   (1-2 clear sentences summarizing what the visual displays)
+   ### 2. Key Data Insights
+   (Bullet points detailing the specific numbers, shares %, top categories/destinations, comparisons, and rankings shown in the chart)
+   ### 3. Notable Observations
+   (Key data patterns, seasonal spikes, or specific product differences visible in the graph)
+3. Do NOT mention HHI or broad national macroeconomic policy roadmaps.
+"""
+        elif is_list_request:
+            rules = """
+CRITICAL LIST / BREAKDOWN RULES:
+1. Output a clean, concise bullet list of the commodities from the DuckDB query result.
+2. Format each item as: * **Commodity Name** (HS8 code)
+3. Jump DIRECTLY into the list with a simple 1-line header (e.g., "The following are the [commodity] commodities available in the dataset:").
+4. NEVER include robotic persona preambles like "As a Senior Agricultural Trade Data Analyst...", "I have processed...", or "Based on the records...".
+5. If the user asked about a specific crop (e.g., pepper), include ONLY that crop's products. Never include related or adjacent sub-products (e.g. do NOT include chili in pepper).
+"""
+        else:
+            rules = """
+CRITICAL DATA ANALYST RULES:
+1. Answer directly, concisely, and accurately based strictly on the trade dataset context and DuckDB query results.
+2. NEVER include conversational filler, persona introductions, or robotic preambles.
+3. Focus strictly on the scope of the user's question without unrequested filler.
+"""
 
         prompt = f"""
-You are an intelligent, natural conversational AI Assistant for Cambodia Agricultural Trade Analytics.
-You are a Senior Agricultural Trade Data Analyst for Cambodia.
-Answer ONLY what the user asks for based strictly on the uploaded trade dataset.
+{rules}
 
+DATA CONTEXT:
 {context_summary}
 
 USER QUESTION: "{question}"
 
-CRITICAL RULES:
-1. If the user greets or says casual messages ("hi", "hello"): reply in 1-2 friendly sentences only.
-2. If the user asks a specific trade question or clicks "Ask AI" on a chart: provide a complete, direct, data-backed answer with exact figures and percentages. Never state that data is missing.
-3. Organize the response cleanly using structured markdown with bullet points and bold key numbers.
-4. Use clean English product and partner country names.
-CRITICAL SENIOR DATA ANALYST RULES:
-1. Chart Insights ("Ask AI" inquiries):
-   - Explain ONLY the insights and data patterns of that specific chart.
-   - Do NOT generate broad macroeconomic drivers, national policy recommendations, or strategic roadmaps in chart explanations. High-level roadmaps encompass holistic macro data, whereas your role here is strictly explaining the current visual graph.
-   - Structure chart responses clearly:
-     ### 1. Chart Summary
-     (1-2 clear sentences summarizing what the visual displays)
-     ### 2. Key Data Insights
-     (Bullet points detailing the specific numbers, shares %, top categories/destinations, comparisons, and rankings shown in the chart)
-     ### 3. Notable Observations
-     (Key data patterns, seasonal spikes, concentration indices, or specific product differences visible in the graph)
-2. Unit Price Rule: NEVER calculate or quote an average price per kg for 4-digit HS4 chapters (e.g. HS 0801), as HS4 aggregates diverse commodities. Unit price ($/kg) is ONLY meaningful and accurate at the 8-digit HS8 commodity level.
-3. Clean English Names: Always use clean English commodity and destination country names.
-4. If greeting or casual: reply in 1-2 friendly sentences.
+Direct Answer:
 """
 
         response = self._call_gemini_api(prompt, is_json=False)
         if response:
+            # Programmatically clean any accidental persona preambles
+            cleaned = re.sub(r'^(?:As a (?:Senior )?Agricultural.*?(?:\.|\:|\n)\s*)+', '', response, flags=re.IGNORECASE).strip()
+            cleaned = re.sub(r'^(?:Based on (?:the )?(?:current )?trade records.*?(?:\.|\:|\n)\s*)+', '', cleaned, flags=re.IGNORECASE).strip()
+            cleaned = re.sub(r'^(?:I have processed.*?(?:\.|\:|\n)\s*)+', '', cleaned, flags=re.IGNORECASE).strip()
+            if cleaned:
+                return cleaned
             return response
 
-        # Intelligent Topic-Specific Fallback (if API is temporarily unreachable)
-        # Intelligent Senior Data Analyst Fallback (if external API is temporarily unreachable)
-        q_low = question.lower()
-        if any(k in q_low for k in ["destination", "country", "market", "buyer", "concentration"]):
-            top1 = country_list[0] if country_list else {'country': 'Vietnam', 'val_usd': 722700000.0}
-            top2 = country_list[1] if len(country_list) > 1 else {'country': 'Thailand', 'val_usd': 106180000.0}
-            share1 = (top1.get('val_usd', 0) / max(1.0, total_usd)) * 100
-            share2 = (top2.get('val_usd', 0) / max(1.0, total_usd)) * 100
+        # Robust Data-Grounded Fallback (if Gemini API is unreachable)
+        if is_single_metric and duckdb_results:
+            row = duckdb_results[0]
+            raw_scope = str(row.get('scope') or row.get('product_name') or row.get('country') or row.get('hs4_code') or 'agricultural trade')
+            if raw_scope.endswith(' Total'):
+                scope_display = raw_scope[:-6]
+            elif raw_scope in ['Dataset', 'agricultural trade']:
+                scope_display = 'agricultural exports'
+            else:
+                scope_display = raw_scope
+
+            vol = row.get('total_volume_ton', row.get('volume_ton', 0))
+            val = row.get('total_val_usd', row.get('val_usd', 0))
+            price = row.get('avg_price_usd_per_kg', row.get('price_usd_per_kg', 0))
+
+            if any(w in q_clean for w in ["volume", "ton", "weight", "how much", "how many"]):
+                return f"The total export volume of **{scope_display}** is **{vol:,.2f} Tonnes**."
+            elif any(w in q_clean for w in ["revenue", "value", "dollar", "$", "worth", "val"]):
+                return f"The total export revenue of **{scope_display}** is **${val/1e6:.2f}M USD** (${val:,.2f} USD)."
+            elif any(w in q_clean for w in ["price", "unit price", "$/kg", "cost"]):
+                return f"The average export unit price of **{scope_display}** is **${price:.2f}/kg**."
+            else:
+                return f"The total export of **{scope_display}** is **{vol:,.2f} Tonnes** valued at **${val/1e6:.2f}M USD** (average **${price:.2f}/kg**)."
+
+        if is_comparison and len(duckdb_results) >= 2:
+            r1, r2 = duckdb_results[0], duckdb_results[1]
+            e1 = r1.get('entity') or r1.get('country') or r1.get('product_name') or 'Entity 1'
+            e2 = r2.get('entity') or r2.get('country') or r2.get('product_name') or 'Entity 2'
+            v1, val1 = r1.get('volume_ton', 0), r1.get('val_usd', 0)
+            v2, val2 = r2.get('volume_ton', 0), r2.get('val_usd', 0)
             return (
-                f"### 1. Key Insights\n"
-                f"* **Extreme Market Concentration**: The dataset indicates an elevated HHI score of **{hhi:,.0f}**, reflecting severe concentration risk.\n"
-                f"* **Top Buyer Dominance**: **{top1.get('country')}** represents **${top1.get('val_usd',0)/1e6:.2f}M USD ({share1:.1f}% share)**, followed by **{top2.get('country')}** with **${top2.get('val_usd',0)/1e6:.2f}M USD ({share2:.1f}% share)**.\n"
-                f"* **Combined Regional Share**: The top two regional partners absorb **{(share1+share2):.1f}%** of Cambodia's total agricultural export value.\n\n"
-                f"### 2. Economic Drivers\n"
-                f"* **Cross-Border Raw Material Flow**: Large export volumes moving to neighboring processing hubs (e.g. raw in-shell cashews to Vietnam).\n"
-                f"* **Discounted Unit Realization**: Heavy reliance on intermediary markets reduces domestic bargaining power and producer margins.\n\n"
-                f"### 3. Recommended Strategic Roadmap\n"
-                f"1. **Bilateral Market Diversification**: Secure direct phytosanitary protocols to expand shipments directly to China, Japan, the EU, and North America.\n"
-                f"2. **Domestic Value Addition**: Subsidize local processing factories to export finished products directly rather than raw bulk crops."
-                f"### 1. Chart Summary\n"
-                f"This visual highlights the distribution of Cambodia's agricultural export value across international destination markets.\n\n"
-                f"### 2. Key Data Insights\n"
-                f"* **Primary Market**: **{top1.get('country')}** is the lead destination, accounting for **${top1.get('val_usd',0)/1e6:.2f}M USD ({share1:.1f}% share)** of total agricultural export revenue.\n"
-                f"* **Secondary Regional Buyer**: **{top2.get('country')}** represents the second largest market at **${top2.get('val_usd',0)/1e6:.2f}M USD ({share2:.1f}% share)**.\n"
-                f"* **Top-2 Market Concentration**: Together, the top two regional buyers absorb **{(share1+share2):.1f}%** (${(top1.get('val_usd',0)+top2.get('val_usd',0))/1e6:.2f}M USD) of all exported value.\n\n"
-                f"### 3. Notable Visual Observations\n"
-                f"* **Market Concentration Index (HHI)**: The Herfindahl-Hirschman Index is **{hhi:,.0f}**, indicating strong geographic concentration in neighboring ASEAN off-takers."
-            )
-        elif any(k in q_low for k in ["raw", "process", "price", "jump", "multiplier"]):
-        elif any(k in q_low for k in ["raw", "process", "jump", "multiplier"]):
-            return (
-                f"### 1. Key Insights\n"
-                f"* **Substantial Value Multipliers**: Processing raw agricultural crops increases export price realization significantly.\n"
-                f"* **Cashew Nuts (HS 0801)**: Raw in-shell cashew exports at **$1.23/kg** whereas processed shelled cashew kernels export at **$6.12/kg** (a **5.0x price jump**).\n"
-                f"* **Pepper (HS 0904)**: Unprocessed pepper exports at **$4.10/kg** versus processed pepper at **$9.85/kg** (a **2.4x price jump**).\n\n"
-                f"### 2. Economic Drivers\n"
-                f"* Exporting raw commodities exports domestic manufacturing jobs and processing profit margins to neighboring countries.\n\n"
-                f"### 3. Recommended Strategic Roadmap\n"
-                f"1. **Agro-Processing Zones**: Develop dedicated agro-industrial parks with discounted power tariffs and tax incentives.\n"
-                f"2. **Technology Modernization**: Support domestic processors with low-interest credit for modern shelling, grading, and packaging equipment."
-                f"### 1. Chart Summary\n"
-                f"This chart compares export values and unit price realizations between raw agricultural commodities and processed products across key chapters.\n\n"
-                f"### 2. Key Data Insights\n"
-                f"* **Cashew Nuts (HS 0801)**: Raw in-shell cashew exports stand at $622.12M USD at **$1.23/kg** (HS 08013100), whereas processed shelled cashew kernels export at **$6.12/kg** (HS 08013200), demonstrating a **5.0x price jump**.\n"
-                f"* **Fresh vs Dried Mangoes (HS 0804)**: Fresh mangoes export at **$0.28/kg** (HS 08045021) versus dried mangoes at **$3.79/kg** (HS 08045022), yielding a **13.5x value realization gain**.\n"
-                f"* **Pepper (HS 0904)**: Unprocessed pepper exports at **$4.10/kg** (HS 09041110) compared to processed pepper at **$9.85/kg** (HS 09041210), reflecting a **2.4x price premium**.\n\n"
-                f"### 3. Notable Visual Observations\n"
-                f"* In all monitored chapters, processed HS8 product lines achieve significantly higher unit price realizations over their raw commodity counterparts."
-            )
-        elif any(k in q_low for k in ["season", "month", "timeline", "trend"]):
-            return (
-                f"### 1. Key Insights\n"
-                f"* **Q1 Export Peak**: Export volumes surge strongly during harvest season from February to April.\n"
-                f"* **Off-Season Tightening**: Supply drops significantly during Q3/Q4, creating off-season unit price increases.\n\n"
-                f"### 2. Economic Drivers\n"
-                f"* Lack of post-harvest cold-storage forces immediate selling during harvest gluts at lower farm-gate prices.\n\n"
-                f"### 3. Recommended Strategic Roadmap\n"
-                f"1. **Cold-Chain Infrastructure**: Invest in commercial cold-storage facilities near production hubs to extend selling windows.\n"
-                f"2. **Warehouse Financing**: Implement warehouse receipt financing so farmers can hold inventory for off-season price premiums."
-                f"### 1. Chart Summary\n"
-                f"This time-series chart illustrates monthly agricultural export value trends across the 15-month reporting timeline.\n\n"
-                f"### 2. Key Data Insights\n"
-                f"* **Q1 Seasonal Surge**: Export values peak heavily during Q1 (February through April), aligning with the primary harvest windows for raw cashew nuts and fresh produce.\n"
-                f"* **Off-Season Contraction**: Export activity drops substantially entering Q3 and Q4 as peak harvesting cycles conclude.\n"
-                f"* **Peak vs Trough Dynamics**: Monthly export values range from over $180M USD during harvest peaks to under $25M USD during off-peak quarters.\n\n"
-                f"### 3. Notable Visual Observations\n"
-                f"* The export curve demonstrates distinct agricultural seasonality with high volume concentration in the first four months of each calendar year."
+                f"Comparing exports: **{e1}** accounts for **{v1:,.2f} Tonnes** valued at **${val1/1e6:.2f}M USD**, "
+                f"while **{e2}** accounts for **{v2:,.2f} Tonnes** valued at **${val2/1e6:.2f}M USD**."
             )
 
-        top_crop = self._clean_chapter_title(hs4_list[0]) if len(hs4_list) > 0 else 'Cashew Nuts & Coconuts (HS 0801)'
-        top_crop_share = hs4_list[0].get('revenue_share_pct', 74.3) if len(hs4_list) > 0 else 74.3
-        top_crop_val = hs4_list[0].get('val_usd', total_usd * 0.743) if len(hs4_list) > 0 else total_usd * 0.743
-        return (
-            f"### 1. Key Insights\n"
-            f"* **Leading Agricultural Driver**: **{top_crop}** accounts for **{top_crop_share:.1f}%** of total export value (${(total_usd*top_crop_share/100)/1e6:.2f}M USD).\n"
-            f"* **Total Agricultural Trade Scale**: **${total_usd/1e6:.2f} Million USD** across **{total_weight:,.1f} Tonnes** (average unit price **${avg_price:.2f}/kg**).\n"
-            f"* **Market Concentration**: Overall market concentration score stands at **HHI {hhi:,.0f}**.\n\n"
-            f"### 2. Strategic Recommendations\n"
-            f"1. Expand local agro-processing capacity to capture higher margins before exporting.\n"
-            f"2. Broaden direct export market channels to reduce geographic concentration risk."
-            f"### 1. Chart Summary\n"
-            f"This chart illustrates the export revenue and volume contribution across Cambodia's 4-digit HS agricultural commodity chapters.\n\n"
-            f"### 2. Key Data Insights\n"
-            f"* **Primary Export Chapter**: **{top_crop}** leads the sector, generating **${top_crop_val/1e6:.2f}M USD ({top_crop_share:.1f}% share)** of total agricultural export value.\n"
-            f"* **Total Agricultural Scale**: Across all chapters, total export value reaches **${total_usd/1e6:.2f} Million USD** across **{total_weight:,.1f} Tonnes**.\n"
-            f"* **Revenue Distribution**: The top 2 chapters generate over **96%** of total agricultural export revenue.\n\n"
-            f"### 3. Notable Visual Observations\n"
-            f"* Export earnings are heavily anchored in a single dominant commodity chapter, with smaller contributions from specialty spices and fruits."
-        )
+        if is_list_request and duckdb_results:
+            lines = ["The following commodities are available in the dataset:"]
+            for r in duckdb_results:
+                name = r.get('product_name') or r.get('country') or 'Commodity'
+                code = r.get('hs8_code') or r.get('hs4_code')
+                if code:
+                    lines.append(f"* **{name}** (HS8 {code})")
+                else:
+                    lines.append(f"* **{name}**")
+            return "\n".join(lines)
+
+        if is_chart_inquiry:
+            top_crop = hs8_list[0].get('name_en') if len(hs8_list) > 0 else 'Primary Commodity'
+            top_crop_val = hs8_list[0].get('val_usd', 0) if len(hs8_list) > 0 else total_usd
+            top_crop_share = (top_crop_val / max(0.001, total_usd)) * 100.0
+            return (
+                f"### 1. Chart Summary\n"
+                f"This visual displays the export performance metrics grounded strictly in the active dataset.\n\n"
+                f"### 2. Key Data Insights\n"
+                f"* **Leading Driver**: **{top_crop}** leads the trade data, capturing **${top_crop_val/1e6:.2f}M USD ({top_crop_share:.1f}% share)**.\n"
+                f"* **Dataset Totals**: Across all categories, total trade reaches **${total_usd/1e6:.2f} Million USD** ({total_weight:,.2f} Tonnes).\n\n"
+                f"### 3. Notable Observations\n"
+                f"* High concentration in leading agricultural categories and top partner corridors."
+            )
+
+        return f"Across the active trade dataset, total agricultural export value is **${total_usd/1e6:.2f} Million USD** ({total_weight:,.2f} Tonnes) at an average unit price of **${metrics.get('overall_avg_price_usd_per_kg', 0):.2f}/kg**."
 
 ai_service = AIService()

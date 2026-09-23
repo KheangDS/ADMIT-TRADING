@@ -14,10 +14,26 @@ export interface AiMeaning {
 
 export interface ChartConfig {
   chart_id: string;
-  chart_type: 'HORIZONTAL_BAR' | 'DONUT' | 'LINE' | 'PAIRED_BAR';
+  chart_type: 'HORIZONTAL_BAR' | 'DONUT' | 'LINE' | 'TABLE' | 'PAIRED_BAR';
   title: string;
   data: any[];
   ai_meaning?: AiMeaning;
+}
+
+export interface Hs8CommoditySummary {
+  hs8_code: string;
+  hs4_code: string;
+  name_en: string;
+  name_km: string;
+  category_en: string;
+  category_km: string;
+  weight_tonnes: number;
+  weight_kg?: number;
+  val_usd: number;
+  val_khr: number;
+  revenue_share_pct: number;
+  volume_share_pct: number;
+  unit_price_usd_per_kg: number;
 }
 
 export interface Hs4CategorySummary {
@@ -29,8 +45,23 @@ export interface Hs4CategorySummary {
   full_desc_en?: string;
   full_desc_km?: string;
   weight_tonnes: number;
+  weight_kg?: number;
   val_usd: number;
   val_khr: number;
+  revenue_share_pct: number;
+  volume_share_pct: number;
+  unit_price_usd_per_kg: number;
+}
+
+export interface MarketShareItem {
+  country: string;
+  country_en: string;
+  country_kh: string;
+  country_iso3: string;
+  val_usd: number;
+  val_khr: number;
+  weight_ton: number;
+  weight_kg?: number;
   revenue_share_pct: number;
   volume_share_pct: number;
   unit_price_usd_per_kg: number;
@@ -51,6 +82,14 @@ export interface MarketBreakdownItem {
   val_khr: number;
   weight_kg: number;
   share_pct: number;
+}
+
+export interface YearlyMarketItem {
+  country: string;
+  year: number;
+  val_usd: number;
+  val_khr: number;
+  weight_kg: number;
 }
 
 export interface MonthlyTrendItem {
@@ -91,8 +130,10 @@ export interface CommodityDetail {
   avg_price_usd_per_kg: number;
   avg_price_khr_per_kg: number;
   num_markets: number;
+  total_transactions?: number;
   monthly_trend: MonthlyTrendItem[];
   market_breakdown: MarketBreakdownItem[];
+  yearly_markets?: YearlyMarketItem[];
   raw_vs_processed: RawVsProcessed | null;
 }
 
@@ -116,7 +157,9 @@ export interface DashboardPayload {
   available_years?: number[];
   available_countries?: string[];
   summary_kpis: KpiMetric[];
+  hs8_commodities: Hs8CommoditySummary[];
   hs4_categories: Hs4CategorySummary[];
+  market_share_table: MarketShareItem[];
   level1_charts: ChartConfig[];
   hhi_risk_score: number;
   is_high_risk: boolean;

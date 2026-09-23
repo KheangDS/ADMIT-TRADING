@@ -35,7 +35,7 @@ class AiMeaning(BaseModel):
 
 class ChartConfig(BaseModel):
     chart_id: str
-    chart_type: str  # 'HORIZONTAL_BAR', 'DONUT', 'LINE', 'PAIRED_BAR'
+    chart_type: str  # 'HORIZONTAL_BAR', 'DONUT', 'LINE', 'TABLE', 'PAIRED_BAR'
     title: str
     data: List[Dict[str, Any]]
     ai_meaning: Optional[AiMeaning] = None
@@ -49,8 +49,37 @@ class Hs4CategorySummary(BaseModel):
     full_desc_en: Optional[str] = None
     full_desc_km: Optional[str] = None
     weight_tonnes: float
+    weight_kg: Optional[float] = 0.0
     val_usd: float
     val_khr: float
+    revenue_share_pct: float
+    volume_share_pct: float
+    unit_price_usd_per_kg: float = 0.0
+
+class Hs8CommoditySummary(BaseModel):
+    hs8_code: str
+    hs4_code: str
+    name_en: str
+    name_km: str
+    category_en: str
+    category_km: str
+    weight_tonnes: float
+    weight_kg: Optional[float] = 0.0
+    val_usd: float
+    val_khr: float
+    revenue_share_pct: float
+    volume_share_pct: float
+    unit_price_usd_per_kg: float
+
+class MarketShareItem(BaseModel):
+    country: str
+    country_en: str
+    country_kh: str
+    country_iso3: str
+    val_usd: float
+    val_khr: float
+    weight_ton: float
+    weight_kg: Optional[float] = 0.0
     revenue_share_pct: float
     volume_share_pct: float
     unit_price_usd_per_kg: float
@@ -75,7 +104,9 @@ class DashboardPayload(BaseModel):
     available_years: List[int] = []
     available_countries: List[str] = []
     summary_kpis: List[KpiMetric] = []
+    hs8_commodities: List[Hs8CommoditySummary] = []
     hs4_categories: List[Hs4CategorySummary] = []
+    market_share_table: List[MarketShareItem] = []
     level1_charts: List[ChartConfig] = []
     hhi_risk_score: float = 0.0
     is_high_risk: bool = False

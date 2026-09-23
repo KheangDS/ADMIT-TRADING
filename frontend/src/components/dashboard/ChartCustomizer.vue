@@ -10,53 +10,120 @@
           </span>
         </div>
         
-          <!-- Customizer Widget Control Bar & Ask AI Button -->
-          <div class="flex items-center gap-2 flex-wrap">
-            <button
-              @click="store.askAboutChart(title, aiMeaning?.explanation)"
-              class="cursor-pointer flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-600 hover:to-indigo-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all"
-              title="Ask AI to analyze this graph and give recommendations"
-            >
-              <SparklesIcon class="w-3.5 h-3.5" />
-              <span>Ask AI</span>
-            </button>
+        <!-- Controls Bar: Ask AI + Top-N + Unit Selector -->
+        <div class="flex items-center gap-2 flex-wrap">
+          <button
+            @click="store.askAboutChart(title, aiMeaning?.explanation)"
+            class="cursor-pointer flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-600 hover:to-indigo-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all"
+            title="Ask AI to analyze this graph"
+          >
+            <SparklesIcon class="w-3.5 h-3.5" />
+            <span>Ask AI</span>
+          </button>
 
-            <!-- Top-N Countries Slicer (Inside Destination Chart when All Markets is active) -->
-            <div 
-              v-if="chartId === 'chart_market_share' && store.filterCountry === 'ALL'" 
-              class="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-semibold"
+          <!-- Top-N Slicer for Commodity Donut or Country Bar Charts -->
+          <div 
+            v-if="chartId === 'chart_commodity_share' || chartId === 'chart_market_share'" 
+            class="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-semibold"
+          >
+            <span class="text-[10px] text-slate-500 font-bold px-1 uppercase tracking-wider">Top:</span>
+            <button
+              v-for="n in [5, 10]"
+              :key="n"
+              @click="topNLimit = n"
+              :class="[
+                'cursor-pointer px-2 py-0.5 rounded-lg transition-all text-xs',
+                topNLimit === n
+                  ? 'bg-white text-sky-600 shadow-xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900'
+              ]"
             >
-              <span class="text-[10px] text-slate-500 font-bold px-1 uppercase tracking-wider">Top:</span>
-              <button
-                v-for="n in [3, 5, 10]"
-                :key="n"
-                @click="topNLimit = n"
-                :class="[
-                  'cursor-pointer px-2 py-0.5 rounded-lg transition-all text-xs',
-                  topNLimit === n
-                    ? 'bg-white text-sky-600 shadow-xs font-bold'
-                    : 'text-slate-600 hover:text-slate-900'
-                ]"
-              >
-                {{ n }}
-              </button>
-              <button
-                @click="topNLimit = 999"
-                :class="[
-                  'cursor-pointer px-2 py-0.5 rounded-lg transition-all text-xs',
-                  topNLimit === 999
-                    ? 'bg-white text-sky-600 shadow-xs font-bold'
-                    : 'text-slate-600 hover:text-slate-900'
-                ]"
-              >
-                All
-              </button>
-            </div>
+              {{ n }}
+            </button>
+            <button
+              @click="topNLimit = 999"
+              :class="[
+                'cursor-pointer px-2 py-0.5 rounded-lg transition-all text-xs',
+                topNLimit === 999
+                  ? 'bg-white text-sky-600 shadow-xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900'
+              ]"
+            >
+              All
+            </button>
           </div>
+
+          <!-- For Table Charts (which display both Volume and Revenue simultaneously) -->
+          <template v-if="chartId === 'chart_market_share_table' || chartType === 'TABLE'">
+            <div class="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-semibold">
+              <span class="text-[10px] text-slate-500 font-bold px-1 uppercase tracking-wider">Vol:</span>
+              <select
+                v-model="volumeUnit"
+                class="bg-white text-slate-700 text-xs font-bold rounded-lg px-2 py-0.5 border border-slate-200/60 shadow-xs focus:ring-1 focus:ring-sky-500 cursor-pointer outline-none"
+                title="Select Table Volume Display Unit"
+              >
+                <option value="AUTO">Auto ({{ autoVolumeLabel }})</option>
+                <option value="MT">Million Tonnes (Mt)</option>
+                <option value="KT">Kilo Tonnes (kT)</option>
+                <option value="T">Tonnes (t)</option>
+                <option value="KG">Kilograms (kg)</option>
+              </select>
+            </div>
+
+            <div class="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-semibold">
+              <span class="text-[10px] text-slate-500 font-bold px-1 uppercase tracking-wider">Rev:</span>
+              <select
+                v-model="revenueUnit"
+                class="bg-white text-slate-700 text-xs font-bold rounded-lg px-2 py-0.5 border border-slate-200/60 shadow-xs focus:ring-1 focus:ring-sky-500 cursor-pointer outline-none"
+                title="Select Table Revenue Display Unit"
+              >
+                <option value="AUTO">Auto ({{ autoRevenueLabel }})</option>
+                <option value="T">Trillions ($T)</option>
+                <option value="B">Billions ($B)</option>
+                <option value="M">Millions ($M)</option>
+                <option value="K">Thousands ($k)</option>
+                <option value="EXACT">Exact ($)</option>
+              </select>
+            </div>
+          </template>
+
+          <!-- For Single-Metric Charts (Donut, Bar, Line) toggled by global metric slicer -->
+          <div v-else class="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-semibold">
+            <span class="text-[10px] text-slate-500 font-bold px-1 uppercase tracking-wider">Unit:</span>
+            <!-- Revenue Unit Dropdown -->
+            <select
+              v-if="store.filterMetric !== 'TONNES'"
+              v-model="revenueUnit"
+              class="bg-white text-slate-700 text-xs font-bold rounded-lg px-2 py-0.5 border border-slate-200/60 shadow-xs focus:ring-1 focus:ring-sky-500 cursor-pointer outline-none"
+              title="Select Revenue Display Unit"
+            >
+              <option value="AUTO">Auto ({{ autoRevenueLabel }})</option>
+              <option value="T">Trillions ($T)</option>
+              <option value="B">Billions ($B)</option>
+              <option value="M">Millions ($M)</option>
+              <option value="K">Thousands ($k)</option>
+              <option value="EXACT">Exact ($)</option>
+            </select>
+            <!-- Volume Unit Dropdown -->
+            <select
+              v-else
+              v-model="volumeUnit"
+              class="bg-white text-slate-700 text-xs font-bold rounded-lg px-2 py-0.5 border border-slate-200/60 shadow-xs focus:ring-1 focus:ring-sky-500 cursor-pointer outline-none"
+              title="Select Volume Display Unit"
+            >
+              <option value="AUTO">Auto ({{ autoVolumeLabel }})</option>
+              <option value="MT">Million Tonnes (Mt)</option>
+              <option value="KT">Kilo Tonnes (kT)</option>
+              <option value="T">Tonnes (t)</option>
+              <option value="KG">Kilograms (kg)</option>
+            </select>
+          </div>
+        </div>
       </div>
 
-      <!-- ECharts Rendering Container -->
+      <!-- Content Container -->
       <div class="h-64 w-full relative">
+        <!-- Empty State -->
         <div 
           v-if="filteredData.length === 0" 
           class="h-full w-full flex flex-col items-center justify-center bg-slate-50/50 rounded-xl border border-dashed border-slate-200 text-center p-4"
@@ -69,6 +136,52 @@
             No trade activity recorded for the active chapter, time period, or destination market.
           </p>
         </div>
+
+        <!-- Render Table (if chart_type === 'TABLE' or chartId === 'chart_market_share_table') -->
+        <div 
+          v-else-if="chartId === 'chart_market_share_table' || chartType === 'TABLE'" 
+          class="h-full w-full overflow-y-auto overflow-x-auto rounded-xl border border-slate-100 text-xs"
+        >
+          <table class="w-full text-left border-collapse">
+            <thead class="bg-slate-50 text-slate-600 font-bold uppercase text-[10px] tracking-wider sticky top-0 z-10 border-b border-slate-200">
+              <tr>
+                <th class="py-2 px-3">Rank</th>
+                <th class="py-2 px-3">Destination Market</th>
+                <th class="py-2 px-3 text-right">Volume ({{ activeVolumeMeta.suffix.trim() || 't' }})</th>
+                <th class="py-2 px-3 text-right">Volume %</th>
+                <th class="py-2 px-3 text-right">Revenue ({{ activeRevenueMeta.label }})</th>
+                <th class="py-2 px-3 text-right">Revenue %</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 text-slate-800">
+              <tr 
+                v-for="(row, idx) in tableRows" 
+                :key="row.country || idx" 
+                class="hover:bg-slate-50/80 transition-colors"
+              >
+                <td class="py-2 px-3 font-mono font-bold text-slate-500">#{{ row.rank || (idx + 1) }}</td>
+                <td class="py-2 px-3 font-semibold text-slate-900 flex items-center gap-1.5">
+                  <span>{{ row.country_en || row.country }}</span>
+                  <span v-if="row.country_kh && row.country_kh !== row.country_en" class="text-[10px] text-slate-400">({{ row.country_kh }})</span>
+                </td>
+                <td class="py-2 px-3 text-right font-medium text-slate-700">
+                  {{ formatVolumeCell(row.weight_ton) }}
+                </td>
+                <td class="py-2 px-3 text-right font-bold text-sky-700">
+                  {{ (row.volume_share_pct || 0).toFixed(1) }}%
+                </td>
+                <td class="py-2 px-3 text-right font-bold text-slate-900">
+                  {{ formatRevenueCell(row.val_usd) }}
+                </td>
+                <td class="py-2 px-3 text-right font-black text-emerald-600">
+                  {{ (row.revenue_share_pct || 0).toFixed(1) }}%
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Render EChart -->
         <v-chart v-else class="w-full h-full" :option="chartOption" autoresize />
       </div>
     </div>
@@ -108,454 +221,381 @@ const store = useDatasetStore();
 const props = defineProps<{
   chartId?: string;
   title: string;
-  chartType: 'HORIZONTAL_BAR' | 'DONUT' | 'LINE' | 'PAIRED_BAR';
+  chartType: 'HORIZONTAL_BAR' | 'DONUT' | 'LINE' | 'TABLE' | 'PAIRED_BAR';
   data: any[];
   aiMeaning?: AiMeaning;
 }>();
 
 const topNLimit = ref<number>(5);
 
-const currentType = ref<'BAR' | 'LINE' | 'DONUT'>(
-  props.chartId === 'chart_market_share' || props.chartType === 'DONUT'
-    ? 'DONUT'
-    : props.chartId === 'chart_commodity_share' || props.chartId === 'chart_price_jump'
-      ? 'BAR'
-      : 'LINE'
-);
+// Independent Unit Selector State per Chart
+export type RevenueUnit = 'AUTO' | 'T' | 'B' | 'M' | 'K' | 'EXACT';
+export type VolumeUnit = 'AUTO' | 'MT' | 'KT' | 'T' | 'KG';
 
-const dynamicTitle = computed(() => {
-  const hsNameMap: Record<string, string> = {
-    '0801': 'Cashew Nuts & Coconuts',
-    '0804': 'Fresh & Dried Mangoes',
-    '0904': 'Pepper & Chili',
-    '0910': 'Ginger & Spices',
-    '1211': 'Medicinal Plants'
-  };
-  const activeHsText = store.filterHsCode !== 'ALL' 
-    ? ` (HS ${store.filterHsCode}${hsNameMap[store.filterHsCode] ? ' · ' + hsNameMap[store.filterHsCode] : ''})` 
-    : '';
-  const activeYearText = store.filterYear !== 'ALL' ? ` · ${store.filterYear}` : '';
-  const activeCountryText = store.filterCountry !== 'ALL' ? ` · ${store.filterCountry}` : '';
-  const filterSuffix = `${activeHsText}${activeYearText}${activeCountryText}`;
-  const isTonnes = store.filterMetric === 'TONNES';
-  const dataset = filteredData.value;
-  const currentUnit = dataset.length > 0 && dataset[0].unitLabel ? dataset[0].unitLabel : (isTonnes ? 'Tonnes' : '$M USD');
+const revenueUnit = ref<RevenueUnit>('AUTO');
+const volumeUnit = ref<VolumeUnit>('AUTO');
 
-  if (props.chartId === 'chart_commodity_share') {
-    if (isTonnes) return `Export Volume by Commodity Chapter (${currentUnit})${filterSuffix}`;
-    return `Export Revenue by Commodity Chapter (${currentUnit})${filterSuffix}`;
-  }
-  if (props.chartId === 'chart_market_share') {
-    const topSuffix = (store.filterCountry === 'ALL' && topNLimit.value < 999) ? ` (Top ${topNLimit.value})` : '';
-    if (isTonnes) return `Destination Country Volume Share (${currentUnit})${topSuffix}${filterSuffix}`;
-    return `Destination Country Revenue Share (${currentUnit})${topSuffix}${filterSuffix}`;
-  }
-  if (props.chartId === 'chart_seasonality') {
-    if (isTonnes) return `Monthly Export Timeline: Volume (${currentUnit})${filterSuffix}`;
-    return `Monthly Export Timeline: Value (${currentUnit})${filterSuffix}`;
-  }
-  if (props.chartId === 'chart_price_jump') {
-    if (isTonnes) return `Volume Comparison: Raw vs Processed Export Volume (${currentUnit})${filterSuffix}`;
-    return `Value Comparison: Raw vs Processed Export Revenue (${currentUnit})${filterSuffix}`;
-  }
-  return props.title;
-});
-
-const filteredSubtitle = computed(() => {
-  if (props.chartId === 'chart_market_share') {
-    if (store.filterCountry !== 'ALL') {
-      return `Filtered for destination: ${store.filterCountry}`;
-    }
-    const allUniqueCountries = new Set(props.data.map(d => d.country || d.name)).size;
-    if (topNLimit.value < 999) {
-      return `Showing Top ${Math.min(topNLimit.value, filteredData.value.length)} destination markets (out of ${allUniqueCountries})`;
-    }
-    return `Showing all ${filteredData.value.length} destination markets`;
-  }
-  if (props.chartId === 'chart_commodity_share') {
-    return `Showing ${filteredData.value.length} commodity chapter${filteredData.value.length > 1 ? 's' : ''}`;
-  }
-  if (props.chartId === 'chart_seasonality') {
-    return `Showing ${filteredData.value.length} monthly timeline periods`;
-  }
-  if (props.chartId === 'chart_price_jump') {
-    return `Comparing ${filteredData.value.length} commodity categories`;
-  }
-  return '';
-});
-
+// Processed and sliced data based on active filters (clean aggregate without unit dependencies)
 const filteredData = computed(() => {
-  const rawList = [...props.data];
+  const rawList = props.data ? [...props.data] : [];
   const hsFilter = store.filterHsCode;
   const yrFilter = store.filterYear;
   const ctryFilter = store.filterCountry;
   const isTonnes = store.filterMetric === 'TONNES';
 
-  // --- CHART 1: Commodity Category Share (HS 4-Digit Chapter Only) ---
+  // 1. Commodity Share (Donut Chart of HS8 Commodities)
   if (props.chartId === 'chart_commodity_share') {
-    let list = rawList.filter(d => d.is_chapter || (!d.is_subproduct && (d.hs4_code || d.name?.startsWith('HS '))));
-    
-    // Filter by Commodity
+    let list = rawList;
     if (hsFilter !== 'ALL') {
-      list = list.filter(d => d.hs4_code === hsFilter || d.name === `HS ${hsFilter}`);
+      list = list.filter(d => (d.hs8_code === hsFilter || d.hs4_code === hsFilter));
     }
-    // Filter by Year
     if (yrFilter !== 'ALL') {
       list = list.filter(d => !d.year || d.year.toString() === yrFilter);
     }
-    // Filter by Country
     if (ctryFilter !== 'ALL') {
-      list = list.filter(d => !d.country || d.country.toLowerCase() === ctryFilter.toLowerCase());
+      list = list.filter(d => !d.country || d.country === 'ALL' || d.country.toLowerCase() === ctryFilter.toLowerCase());
     }
 
-    // Dynamic Aggregation by hs4_code
-    const hsMap = new Map<string, { hs4_code: string; val_usd: number; weight_ton: number; label: string }>();
+    const commMap = new Map<string, any>();
     for (const item of list) {
-      const code = item.hs4_code || (item.name && item.name.startsWith('HS ') ? item.name.replace('HS ', '').trim() : null);
+      const code = item.hs8_code || item.name;
       if (!code) continue;
-      const matched = store.dashboardData?.hs4_categories?.find(c => c.hs4_code === code);
-      const prev = hsMap.get(code) || { 
-        hs4_code: code, 
-        val_usd: 0, 
-        weight_ton: 0, 
-        label: item.label || matched?.official_title || matched?.hs4_desc || '' 
+      const prev = commMap.get(code) || {
+        hs8_code: code,
+        hs4_code: item.hs4_code,
+        name: item.name || item.name_en || code,
+        name_en: item.name_en || item.name || code,
+        name_km: item.name_km,
+        category_en: item.category_en,
+        val_usd: 0,
+        weight_ton: 0
       };
-      
-      const vUsd = item.val_usd !== undefined ? item.val_usd : (item.value ? item.value * 1e6 : (matched?.val_usd || 0));
-      const wTon = item.weight_ton !== undefined ? item.weight_ton : (matched?.weight_tonnes || 0);
-      
-      prev.val_usd += vUsd;
-      prev.weight_ton += wTon;
-      hsMap.set(code, prev);
+      prev.val_usd += (item.val_usd || (item.value ? item.value * 1e6 : 0));
+      prev.weight_ton += (item.weight_ton || 0);
+      commMap.set(code, prev);
     }
 
-    const aggregated = Array.from(hsMap.values());
-    const maxValUsd = aggregated.reduce((max, c) => Math.max(max, c.val_usd), 0);
-    const maxWeightTon = aggregated.reduce((max, c) => Math.max(max, c.weight_ton), 0);
-    const useK = !isTonnes && maxValUsd < 1_000_000;
-    const useKg = isTonnes && maxWeightTon < 1;
-    const unitLabel = isTonnes ? (useKg ? 'kg' : 'Tonnes') : (useK ? '$k USD' : '$M USD');
+    const aggregated = Array.from(commMap.values());
+    const totalVal = aggregated.reduce((acc, c) => acc + (isTonnes ? c.weight_ton : c.val_usd), 0);
 
     return aggregated.map(c => {
-      let displayVal: number;
-      if (isTonnes) {
-        displayVal = useKg ? Math.round(c.weight_ton * 1000 * 10) / 10 : Math.round(c.weight_ton * 10) / 10;
-        displayVal = useKg ? Math.round(c.weight_ton * 1000 * 100) / 100 : Math.round(c.weight_ton * 100) / 100;
-      } else {
-        displayVal = useK ? Math.round((c.val_usd / 1000) * 10) / 10 : Math.round((c.val_usd / 1e6) * 100) / 100;
-        displayVal = useK ? Math.round((c.val_usd / 1000) * 100) / 100 : Math.round((c.val_usd / 1e6) * 100) / 100;
-      }
+      const rawVal = isTonnes ? c.weight_ton : c.val_usd;
+      const share = totalVal > 0 ? (rawVal / totalVal) * 100 : 0;
       return {
-        name: `HS ${c.hs4_code}`,
+        name: c.name_en || c.name,
+        hs8_code: c.hs8_code,
         hs4_code: c.hs4_code,
-        value: displayVal,
-        displayValue: displayVal,
         val_usd: c.val_usd,
         weight_ton: c.weight_ton,
-        label: c.label,
-        unitLabel
+        unit_price_usd_per_kg: c.weight_ton > 0 ? (c.val_usd / (c.weight_ton * 1000)) : 0,
+        sharePct: Math.round(share * 10) / 10
       };
-    }).sort((a, b) => b.displayValue - a.displayValue);
+    }).sort((a, b) => (isTonnes ? b.weight_ton - a.weight_ton : b.val_usd - a.val_usd));
   }
 
-  // --- CHART 2: Destination Market Share ---
+  // 2. Destination Countries (Horizontal Bar Chart)
   if (props.chartId === 'chart_market_share') {
     let list = rawList;
-
-    // Filter by Commodity
     if (hsFilter !== 'ALL') {
-      list = list.filter(d => !d.hs4_code || d.hs4_code === hsFilter);
+      list = list.filter(d => (d.hs8_code === hsFilter || d.hs4_code === hsFilter || d.hs4_code === hsFilter.slice(0, 4)));
     }
-    // Filter by Year
     if (yrFilter !== 'ALL') {
       list = list.filter(d => !d.year || d.year.toString() === yrFilter);
     }
-    // Filter by Country
     if (ctryFilter !== 'ALL') {
       list = list.filter(d => (d.country || d.name || '').toLowerCase() === ctryFilter.toLowerCase());
     }
 
-    // Dynamic Aggregation by Country
-    const countryMap = new Map<string, { country: string; val_usd: number; weight_ton: number }>();
+    const countryMap = new Map<string, any>();
     for (const item of list) {
-      const cname = item.country || item.name;
+      const cname = item.country_en || item.country || item.name;
       if (!cname) continue;
-      const prev = countryMap.get(cname) || { country: cname, val_usd: 0, weight_ton: 0 };
-      const vUsd = item.val_usd !== undefined ? item.val_usd : (item.value ? item.value * 1e6 : 0);
-      const wTon = item.weight_ton !== undefined ? item.weight_ton : 0;
-      prev.val_usd += vUsd;
-      prev.weight_ton += wTon;
+      const prev = countryMap.get(cname) || {
+        country: cname,
+        country_en: cname,
+        country_kh: item.country_kh,
+        val_usd: 0,
+        weight_ton: 0
+      };
+      prev.val_usd += (item.val_usd || (item.value ? item.value * 1e6 : 0));
+      prev.weight_ton += (item.weight_ton || 0);
       countryMap.set(cname, prev);
     }
 
     const aggregated = Array.from(countryMap.values());
     const totalVal = aggregated.reduce((acc, c) => acc + (isTonnes ? c.weight_ton : c.val_usd), 0);
-    const maxValUsd = aggregated.reduce((max, c) => Math.max(max, c.val_usd), 0);
-    const maxWeightTon = aggregated.reduce((max, c) => Math.max(max, c.weight_ton), 0);
-    const useK = !isTonnes && maxValUsd < 1_000_000;
-    const useKg = isTonnes && maxWeightTon < 1;
-    const unitLabel = isTonnes ? (useKg ? 'kg' : 'Tonnes') : (useK ? '$k USD' : '$M USD');
-
-    const sortedList = aggregated.map(c => {
-      let displayVal: number;
-      if (isTonnes) {
-        displayVal = useKg ? Math.round(c.weight_ton * 1000 * 10) / 10 : Math.round(c.weight_ton * 10) / 10;
-      } else {
-        displayVal = useK ? Math.round((c.val_usd / 1000) * 10) / 10 : Math.round((c.val_usd / 1e6) * 100) / 100;
-      }
-      const sharePct = totalVal > 0 ? ((isTonnes ? c.weight_ton : c.val_usd) / totalVal) * 100 : 0;
-      return {
-        name: c.country,
-        country: c.country,
-        value: displayVal,
-        displayValue: displayVal,
-        val_usd: c.val_usd,
-        weight_ton: c.weight_ton,
-        worldSharePct: Math.round(sharePct * 10) / 10,
-        unitLabel
-      };
-    }).sort((a, b) => b.displayValue - a.displayValue);
-
-    // Apply Top N slicing if 'ALL' markets is selected and topNLimit is active
-    if (ctryFilter === 'ALL' && topNLimit.value < 999) {
-      return sortedList.slice(0, topNLimit.value);
-    }
-
-    return sortedList;
-  }
-
-  // --- CHART 3: Raw vs Processed Comparison (Metric Dimension & Slicers Dynamic) ---
-  if (props.chartId === 'chart_price_jump' || props.chartType === 'PAIRED_BAR' || (rawList.length > 0 && (rawList[0].Raw_Value !== undefined || rawList[0].Raw_Val !== undefined || rawList[0].raw_val_usd !== undefined || rawList[0].Raw_Price !== undefined))) {
-    const HS8_PAIR_DEFS: Record<string, { rawCodes: string[]; procCodes: string[]; label: string }> = {
-      '0801': { rawCodes: ['08013100'], procCodes: ['08013200'], label: 'HS 0801 - Cashew Nuts & Coconuts' },
-      '0804': { rawCodes: ['08045021'], procCodes: ['08045022'], label: 'HS 0804 - Fresh & Dried Mangoes' },
-      '0904': { rawCodes: ['09041120', '09041110', '09041190', '09042110'], procCodes: ['09041220', '09041210', '09041290', '09042210'], label: 'HS 0904 - Pepper & Chili (Capsicum)' },
-      '0910': { rawCodes: ['09101100'], procCodes: ['09101200'], label: 'HS 0910 - Ginger, Turmeric & Spices' }
-    };
-
-    let list = rawList;
-    if (hsFilter !== 'ALL') {
-      list = list.filter(d => {
-        if (d.hs4_code) return d.hs4_code === hsFilter;
-        const catName = (d.category || d.name || '').toLowerCase();
-        return catName.includes(hsFilter);
-      });
-    }
-
-    const hasMultiDims = list.some(d => d.year !== undefined || d.country !== undefined);
-
-    if (hasMultiDims) {
-      if (yrFilter !== 'ALL') {
-        list = list.filter(d => d.year && d.year.toString() === yrFilter);
-      }
-      if (ctryFilter !== 'ALL') {
-        list = list.filter(d => d.country && d.country.toLowerCase() === ctryFilter.toLowerCase());
-      }
-    }
-
-    // Dynamic aggregation by hs4_code / category
-    const catMap = new Map<string, any>();
-    for (const item of list) {
-      const code = item.hs4_code || (item.category && item.category.match(/\d{4}/) ? item.category.match(/\d{4}/)[0] : null);
-      if (!code) continue;
-
-      const def = HS8_PAIR_DEFS[code];
-      const categoryLabel = item.category || def?.label || `HS ${code}`;
-
-      const prev = catMap.get(code) || {
-        hs4_code: code,
-        category: categoryLabel,
-        raw_label: item.raw_label || 'Raw Commodity',
-        processed_label: item.processed_label || 'Processed Product',
-        raw_val_usd: 0,
-        raw_weight_ton: 0,
-        proc_val_usd: 0,
-        proc_weight_ton: 0
-      };
-
-      const rVal = item.raw_val_usd !== undefined ? item.raw_val_usd : (item.Raw_Val ? item.Raw_Val * 1e6 : 0);
-      const rTon = item.raw_weight_ton !== undefined ? item.raw_weight_ton : (item.Raw_Tonnes || 0);
-      const pVal = item.proc_val_usd !== undefined ? item.proc_val_usd : (item.Processed_Val ? item.Processed_Val * 1e6 : 0);
-      const pTon = item.proc_weight_ton !== undefined ? item.proc_weight_ton : (item.Processed_Tonnes || 0);
-
-      prev.raw_val_usd += rVal;
-      prev.raw_weight_ton += rTon;
-      prev.proc_val_usd += pVal;
-      prev.proc_weight_ton += pTon;
-      catMap.set(code, prev);
-    }
-
-    // Fallback ONLY when NO filters are active (global unfiltered view)
-    if (catMap.size === 0 && !store.isFiltered && store.dashboardData?.commodity_details) {
-      for (const [code, def] of Object.entries(HS8_PAIR_DEFS)) {
-        let rVal = 0, rTon = 0, pVal = 0, pTon = 0;
-        for (const [hs8, comm] of Object.entries(store.dashboardData.commodity_details)) {
-          const spCode = String(hs8 || '').replace('.0', '').padStart(8, '0');
-          if (def.rawCodes.includes(spCode)) {
-            rVal += comm.total_val_usd || 0;
-            rTon += comm.total_weight_ton || (comm.total_weight_kg ? comm.total_weight_kg / 1000 : 0);
-          } else if (def.procCodes.includes(spCode)) {
-            pVal += comm.total_val_usd || 0;
-            pTon += comm.total_weight_ton || (comm.total_weight_kg ? comm.total_weight_kg / 1000 : 0);
-          }
-        }
-        if (rVal > 0 || pVal > 0 || rTon > 0 || pTon > 0) {
-          catMap.set(code, {
-            hs4_code: code,
-            category: def.label,
-            raw_label: 'Raw Commodity',
-            processed_label: 'Processed Product',
-            raw_val_usd: rVal,
-            raw_weight_ton: rTon,
-            proc_val_usd: pVal,
-            proc_weight_ton: pTon
-          });
-        }
-      }
-    }
-
-    // Slicer Scaling ONLY if rawList did not have year/country rows and filters are active
-    if (!hasMultiDims && (yrFilter !== 'ALL' || ctryFilter !== 'ALL')) {
-      const commodityChart = store.dashboardData?.level1_charts?.find(c => c.chart_id === 'chart_commodity_share');
-      if (commodityChart && commodityChart.data) {
-        for (const [code, valObj] of catMap.entries()) {
-          const catRows = commodityChart.data.filter((d: any) => d.hs4_code === code || d.name === `HS ${code}`);
-          const totalUsd = catRows.reduce((sum: number, d: any) => sum + (d.val_usd || 0), 0);
-          const totalTon = catRows.reduce((sum: number, d: any) => sum + (d.weight_ton || 0), 0);
-
-          let filteredRows = catRows;
-          if (yrFilter !== 'ALL') {
-            filteredRows = filteredRows.filter((d: any) => !d.year || d.year.toString() === yrFilter);
-          }
-          if (ctryFilter !== 'ALL') {
-            filteredRows = filteredRows.filter((d: any) => !d.country || d.country.toLowerCase() === ctryFilter.toLowerCase());
-          }
-          const filteredUsd = filteredRows.reduce((sum: number, d: any) => sum + (d.val_usd || 0), 0);
-          const filteredTon = filteredRows.reduce((sum: number, d: any) => sum + (d.weight_ton || 0), 0);
-
-          const ratioVal = totalUsd > 0 ? (filteredUsd / totalUsd) : 0;
-          const ratioTon = totalTon > 0 ? (filteredTon / totalTon) : 0;
-
-          valObj.raw_val_usd *= ratioVal;
-          valObj.proc_val_usd *= ratioVal;
-          valObj.raw_weight_ton *= ratioTon;
-          valObj.proc_weight_ton *= ratioTon;
-        }
-      }
-    }
-
-    let aggregated = Array.from(catMap.values());
-    if (store.isFiltered) {
-      aggregated = aggregated.filter(c => (c.raw_val_usd > 0 || c.proc_val_usd > 0 || c.raw_weight_ton > 0 || c.proc_weight_ton > 0));
-    }
-
-    const maxValUsd = aggregated.reduce((max, c) => Math.max(max, c.raw_val_usd, c.proc_val_usd), 0);
-    const maxWeightTon = aggregated.reduce((max, c) => Math.max(max, c.raw_weight_ton, c.proc_weight_ton), 0);
-    const useK = !isTonnes && maxValUsd < 1_000_000;
-    const useKg = isTonnes && maxWeightTon < 1;
-    const unitLabel = isTonnes ? (useKg ? 'kg' : 'Tonnes') : (useK ? '$k USD' : '$M USD');
 
     return aggregated.map(c => {
-      let rawDisplay: number;
-      let procDisplay: number;
-      if (isTonnes) {
-        rawDisplay = useKg ? Math.round(c.raw_weight_ton * 1000 * 10) / 10 : Math.round(c.raw_weight_ton * 10) / 10;
-        procDisplay = useKg ? Math.round(c.proc_weight_ton * 1000 * 10) / 10 : Math.round(c.proc_weight_ton * 10) / 10;
-        rawDisplay = useKg ? Math.round(c.raw_weight_ton * 1000 * 100) / 100 : Math.round(c.raw_weight_ton * 100) / 100;
-        procDisplay = useKg ? Math.round(c.proc_weight_ton * 1000 * 100) / 100 : Math.round(c.proc_weight_ton * 100) / 100;
-      } else {
-        rawDisplay = useK ? Math.round((c.raw_val_usd / 1000) * 10) / 10 : Math.round((c.raw_val_usd / 1e6) * 100) / 100;
-        procDisplay = useK ? Math.round((c.proc_val_usd / 1000) * 10) / 10 : Math.round((c.proc_val_usd / 1e6) * 100) / 100;
-        rawDisplay = useK ? Math.round((c.raw_val_usd / 1000) * 100) / 100 : Math.round((c.raw_val_usd / 1e6) * 100) / 100;
-        procDisplay = useK ? Math.round((c.proc_val_usd / 1000) * 100) / 100 : Math.round((c.proc_val_usd / 1e6) * 100) / 100;
-      }
+      const rawVal = isTonnes ? c.weight_ton : c.val_usd;
+      const share = totalVal > 0 ? (rawVal / totalVal) * 100 : 0;
       return {
-        hs4_code: c.hs4_code,
-        category: c.category,
-        name: c.category,
-        raw_label: c.raw_label,
-        processed_label: c.processed_label,
-        raw_val_usd: c.raw_val_usd,
-        raw_weight_ton: c.raw_weight_ton,
-        proc_val_usd: c.proc_val_usd,
-        proc_weight_ton: c.proc_weight_ton,
-        Raw_Value: rawDisplay,
-        Processed_Value: procDisplay,
-        unitLabel
+        name: c.country_en,
+        country: c.country_en,
+        val_usd: c.val_usd,
+        weight_ton: c.weight_ton,
+        sharePct: Math.round(share * 10) / 10
       };
-    });
+    }).sort((a, b) => (isTonnes ? b.weight_ton - a.weight_ton : b.val_usd - a.val_usd));
   }
 
-  // --- CHART 4: Seasonality Monthly Timeline Dynamics ---
+  // 3. Monthly Seasonality Line Chart
   if (props.chartId === 'chart_seasonality') {
     let list = rawList;
-
-    // Filter by Commodity
     if (hsFilter !== 'ALL') {
-      list = list.filter(d => !d.hs4_code || d.hs4_code === hsFilter);
+      list = list.filter(d => (d.hs8_code === hsFilter || d.hs4_code === hsFilter || d.hs4_code === hsFilter.slice(0, 4)));
     }
-    // Filter by Year
     if (yrFilter !== 'ALL') {
-      list = list.filter(d => (!d.year && !d.name) || (d.year && d.year.toString() === yrFilter) || (d.name && d.name.startsWith(`${yrFilter}-`)));
+      list = list.filter(d => !d.year || d.year.toString() === yrFilter);
     }
-    // Filter by Country
     if (ctryFilter !== 'ALL') {
       list = list.filter(d => !d.country || d.country.toLowerCase() === ctryFilter.toLowerCase());
     }
 
-    // Dynamic Aggregation by Month (yyyy_mm)
-    const monthMap = new Map<string, { yyyy_mm: string; val_usd: number; weight_ton: number; weight_kton: number; val_million_usd: number }>();
+    const monthMap = new Map<string, any>();
     for (const item of list) {
-      const yyyymm = item.yyyy_mm || item.name;
-      if (!yyyymm || !/^\d{4}-\d{2}$/.test(yyyymm)) continue;
-      const prev = monthMap.get(yyyymm) || { yyyy_mm: yyyymm, val_usd: 0, weight_ton: 0, weight_kton: 0, val_million_usd: 0 };
-      const vUsd = item.val_usd !== undefined ? item.val_usd : ((item.value_m_usd || item.val_million_usd || 0) * 1e6);
-      const wTon = item.weight_ton !== undefined ? item.weight_ton : ((item.weight_kton || 0) * 1000);
-      prev.val_usd += vUsd;
-      prev.weight_ton += wTon;
-      prev.val_million_usd += vUsd / 1e6;
-      prev.weight_kton += wTon / 1000;
-      monthMap.set(yyyymm, prev);
+      const ym = item.yyyy_mm || item.name;
+      if (!ym || !/^\d{4}-\d{2}$/.test(ym)) continue;
+      const prev = monthMap.get(ym) || { yyyy_mm: ym, val_usd: 0, weight_ton: 0 };
+      prev.val_usd += (item.val_usd || (item.val_million_usd ? item.val_million_usd * 1e6 : 0));
+      prev.weight_ton += (item.weight_ton || (item.weight_kton ? item.weight_kton * 1000 : 0));
+      monthMap.set(ym, prev);
     }
 
-    const sortedMonths = Array.from(monthMap.values()).sort((a, b) => a.yyyy_mm.localeCompare(b.yyyy_mm));
-    const maxValUsd = sortedMonths.reduce((max, m) => Math.max(max, m.val_usd), 0);
-    const maxWeightTon = sortedMonths.reduce((max, m) => Math.max(max, m.weight_ton), 0);
-    const useK = !isTonnes && maxValUsd < 1_000_000;
-    const useKg = isTonnes && maxWeightTon < 1;
-    const unitLabel = isTonnes ? (useKg ? 'kg' : 'Tonnes') : (useK ? '$k USD' : '$M USD');
-
-    return sortedMonths.map(m => {
-      let displayVal: number;
-      if (isTonnes) {
-        displayVal = useKg ? Math.round(m.weight_ton * 1000 * 10) / 10 : Math.round(m.weight_ton * 10) / 10;
-      } else {
-        displayVal = useK ? Math.round((m.val_usd / 1000) * 10) / 10 : Math.round(m.val_million_usd * 100) / 100;
-      }
-      return {
-        name: m.yyyy_mm,
-        yyyy_mm: m.yyyy_mm,
-        value: displayVal,
-        displayValue: displayVal,
-        val_million_usd: Math.round(m.val_million_usd * 100) / 100,
-        weight_kton: Math.round(m.weight_kton * 100) / 100,
-        weight_ton: Math.round(m.weight_ton * 10) / 10,
-        val_usd: m.val_usd,
-        unitLabel
-      };
-    });
+    return Array.from(monthMap.values()).sort((a, b) => a.yyyy_mm.localeCompare(b.yyyy_mm));
   }
 
   return rawList;
 });
 
-const chartOption = computed(() => {
-  const dataset = filteredData.value;
+// Table rows for Market Share Table widget (dynamically responds to Year and Country slicers with True Ranking)
+const tableRows = computed(() => {
+  const rawList = props.data || store.dashboardData?.market_share_table || [];
+  const yrFilter = store.filterYear;
+  const ctryFilter = store.filterCountry;
+
+  // 1. Filter by Year (if active)
+  let yearFiltered = rawList;
+  if (yrFilter !== 'ALL') {
+    yearFiltered = yearFiltered.filter(d => !d.year || d.year.toString() === yrFilter);
+  }
+
+  // 2. Aggregate by Country across the active year scope
+  const countryMap = new Map<string, any>();
+  for (const item of yearFiltered) {
+    const cname = item.country_en || item.country || item.name;
+    if (!cname) continue;
+    const prev = countryMap.get(cname) || {
+      country: cname,
+      country_en: cname,
+      country_kh: item.country_kh || cname,
+      country_iso3: item.country_iso3 || 'OTH',
+      val_usd: 0,
+      weight_ton: 0
+    };
+    prev.val_usd += (item.val_usd || (item.value ? item.value * 1e6 : 0));
+    prev.weight_ton += (item.weight_ton || 0);
+    countryMap.set(cname, prev);
+  }
+
+  const allAggregated = Array.from(countryMap.values());
+  const totalScopeValUSD = allAggregated.reduce((sum, c) => sum + c.val_usd, 0);
+  const totalScopeWeightTon = allAggregated.reduce((sum, c) => sum + c.weight_ton, 0);
+
+  // 3. Sort all countries descending by export revenue to establish TRUE RANK
+  const allRanked = allAggregated
+    .sort((a, b) => b.val_usd - a.val_usd)
+    .map((c, idx) => ({
+      ...c,
+      rank: idx + 1, // True Rank (#1, #2, #3... #14)
+      revenue_share_pct: totalScopeValUSD > 0 ? (c.val_usd / totalScopeValUSD) * 100 : 0,
+      volume_share_pct: totalScopeWeightTon > 0 ? (c.weight_ton / totalScopeWeightTon) * 100 : 0,
+    }));
+
+  // 4. Apply Country filter (if active)
+  if (ctryFilter !== 'ALL') {
+    return allRanked.filter(c => (c.country_en || c.country || '').toLowerCase() === ctryFilter.toLowerCase());
+  }
+
+  // If All Markets, return Top 10
+  return allRanked.slice(0, 10);
+});
+
+// Auto unit detection based on max values
+const autoRevenueUnit = computed<RevenueUnit>(() => {
+  let maxVal = 0;
+  if (props.chartId === 'chart_market_share_table' || props.chartType === 'TABLE') {
+    const rows = tableRows.value || [];
+    if (rows.length > 0) {
+      maxVal = Math.max(...rows.map(r => r.val_usd || 0), 0);
+    }
+  } else {
+    const data = filteredData.value || [];
+    if (data.length > 0) {
+      maxVal = Math.max(...data.map(d => d.val_usd || (d.value ? d.value * 1e6 : 0)), 0);
+    }
+  }
+  if (maxVal >= 1e12) return 'T';
+  if (maxVal >= 1e9) return 'B';
+  if (maxVal >= 1e6) return 'M';
+  if (maxVal >= 1e3) return 'K';
+  return 'EXACT';
+});
+
+const autoVolumeUnit = computed<VolumeUnit>(() => {
+  let maxWeight = 0;
+  if (props.chartId === 'chart_market_share_table' || props.chartType === 'TABLE') {
+    const rows = tableRows.value || [];
+    if (rows.length > 0) {
+      maxWeight = Math.max(...rows.map(r => r.weight_ton || 0), 0);
+    }
+  } else {
+    const data = filteredData.value || [];
+    if (data.length > 0) {
+      maxWeight = Math.max(...data.map(d => d.weight_ton || 0), 0);
+    }
+  }
+  if (maxWeight >= 1e6) return 'MT';
+  if (maxWeight >= 1e3) return 'KT';
+  if (maxWeight >= 1) return 'T';
+  return 'KG';
+});
+
+const autoRevenueLabel = computed(() => {
+  switch (autoRevenueUnit.value) {
+    case 'T': return '$T';
+    case 'B': return '$B';
+    case 'M': return '$M';
+    case 'K': return '$k';
+    case 'EXACT': default: return '$';
+  }
+});
+
+const autoVolumeLabel = computed(() => {
+  switch (autoVolumeUnit.value) {
+    case 'MT': return 'Mt';
+    case 'KT': return 'kT';
+    case 'T': return 't';
+    case 'KG': default: return 'kg';
+  }
+});
+
+const activeRevenueMeta = computed(() => {
+  const unit = revenueUnit.value === 'AUTO' ? autoRevenueUnit.value : revenueUnit.value;
+  switch (unit) {
+    case 'T': return { divisor: 1e12, suffix: 'T', prefix: '$', label: '$T USD', fullUnit: 'Trillion USD ($T)' };
+    case 'B': return { divisor: 1e9, suffix: 'B', prefix: '$', label: '$B USD', fullUnit: 'Billion USD ($B)' };
+    case 'M': return { divisor: 1e6, suffix: 'M', prefix: '$', label: '$M USD', fullUnit: 'Million USD ($M)' };
+    case 'K': return { divisor: 1e3, suffix: 'k', prefix: '$', label: '$k USD', fullUnit: 'Thousand USD ($k)' };
+    case 'EXACT': default: return { divisor: 1, suffix: '', prefix: '$', label: '$ USD', fullUnit: 'Exact USD ($)' };
+  }
+});
+
+const activeVolumeMeta = computed(() => {
+  const unit = volumeUnit.value === 'AUTO' ? autoVolumeUnit.value : volumeUnit.value;
+  switch (unit) {
+    case 'MT': return { divisor: 1e6, suffix: ' Mt', prefix: '', label: 'Million Tonnes (Mt)', fullUnit: 'Million Tonnes (Mt)' };
+    case 'KT': return { divisor: 1e3, suffix: ' kT', prefix: '', label: 'Kilo Tonnes (kT)', fullUnit: 'Kilo Tonnes (kT)' };
+    case 'T': return { divisor: 1, suffix: ' t', prefix: '', label: 'Tonnes (t)', fullUnit: 'Tonnes (t)' };
+    case 'KG': default: return { divisor: 0.001, suffix: ' kg', prefix: '', label: 'Kilograms (kg)', fullUnit: 'Kilograms (kg)' };
+  }
+});
+
+const unitMeta = computed(() => {
+  return store.filterMetric === 'TONNES' ? activeVolumeMeta.value : activeRevenueMeta.value;
+});
+
+const formatRevenueCell = (rawUSD?: number): string => {
+  if (rawUSD === undefined || rawUSD === null || isNaN(rawUSD)) return '$0';
+  const meta = activeRevenueMeta.value;
+  const scaled = rawUSD / meta.divisor;
+  if (meta.divisor === 1) {
+    return `$${Math.round(scaled).toLocaleString()}`;
+  }
+  const formatted = scaled.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+  return `$${formatted}${meta.suffix}`;
+};
+
+const formatVolumeCell = (rawTonnes?: number): string => {
+  if (rawTonnes === undefined || rawTonnes === null || isNaN(rawTonnes)) return '0 t';
+  const meta = activeVolumeMeta.value;
+  const scaled = rawTonnes / meta.divisor;
+  if (meta.divisor === 0.001) {
+    return `${Math.round(scaled).toLocaleString()} kg`;
+  }
+  const formatted = scaled.toLocaleString(undefined, {
+    minimumFractionDigits: scaled % 1 === 0 ? 0 : 1,
+    maximumFractionDigits: 2
+  });
+  return `${formatted}${meta.suffix}`;
+};
+
+const dynamicTitle = computed(() => {
+  const selectedComm = store.dashboardData?.hs8_commodities?.find(c => c.hs8_code === store.filterHsCode)
+    || store.dashboardData?.commodity_list?.find(c => c.hs8_code === store.filterHsCode);
+  const commName = selectedComm ? selectedComm.name_en : '';
+  const activeHsText = store.filterHsCode !== 'ALL' 
+    ? ` (HS ${store.filterHsCode}${commName ? ' · ' + commName : ''})` 
+    : '';
+  const activeYearText = store.filterYear !== 'ALL' ? ` · ${store.filterYear}` : '';
+  const activeCountryText = store.filterCountry !== 'ALL' ? ` · ${store.filterCountry}` : '';
+  const filterSuffix = `${activeHsText}${activeYearText}${activeCountryText}`;
   const isTonnes = store.filterMetric === 'TONNES';
-  const currentUnit = dataset.length > 0 && dataset[0].unitLabel ? dataset[0].unitLabel : (isTonnes ? 'Tonnes' : '$M USD');
-  const isK = currentUnit === '$k USD';
-  const isM = currentUnit === '$M USD';
-  const isKg = currentUnit === 'kg';
+  const topSuffix = topNLimit.value < 999 ? ` (Top ${topNLimit.value})` : '';
+  const activeUnitLabel = isTonnes ? activeVolumeMeta.value.label : activeRevenueMeta.value.label;
+
+  if (props.chartId === 'chart_commodity_share') {
+    if (isTonnes) return `Commodities Export Volume Share${topSuffix}${filterSuffix}`;
+    return `Commodities Export Revenue Share${topSuffix}${filterSuffix}`;
+  }
+  if (props.chartId === 'chart_market_share') {
+    if (isTonnes) return `Top Destination Countries Volume (${activeUnitLabel})${topSuffix}${filterSuffix}`;
+    return `Top Destination Countries Revenue (${activeUnitLabel})${topSuffix}${filterSuffix}`;
+  }
+  if (props.chartId === 'chart_market_share_table') {
+    const yearText = store.filterYear !== 'ALL' ? ` · Year ${store.filterYear}` : '';
+    const countryText = store.filterCountry !== 'ALL' ? ` · ${store.filterCountry}` : '';
+    const baseTitle = store.filterCountry !== 'ALL' ? 'Market Share Summary' : 'Top 10 Market Share Summary';
+    return `${baseTitle}${countryText}${yearText}`;
+  }
+  if (props.chartId === 'chart_seasonality') {
+    if (isTonnes) return `Export Volume by Months (${activeUnitLabel})${filterSuffix}`;
+    return `Export Revenue by Months (${activeUnitLabel})${filterSuffix}`;
+  }
+  return props.title;
+});
+
+const filteredSubtitle = computed(() => {
+  if (props.chartId === 'chart_commodity_share') {
+    return `Showing ${Math.min(topNLimit.value, filteredData.value.length)} of ${filteredData.value.length} HS8 commodities`;
+  }
+  if (props.chartId === 'chart_market_share') {
+    return `Showing ${Math.min(topNLimit.value, filteredData.value.length)} partner markets`;
+  }
+  if (props.chartId === 'chart_market_share_table') {
+    const yearScope = store.filterYear !== 'ALL' ? `in Year ${store.filterYear}` : 'across all reporting periods';
+    if (store.filterCountry !== 'ALL') {
+      return `Market share, export volume, and national rank position for ${store.filterCountry} ${yearScope}`;
+    }
+    return `Export volume and revenue breakdown across top destination partner markets ${yearScope}`;
+  }
+  if (props.chartId === 'chart_seasonality') {
+    const isTonnes = store.filterMetric === 'TONNES';
+    if (isTonnes) return `Monthly export volume trajectory in ${activeVolumeMeta.value.fullUnit}`;
+    return `Monthly export revenue trajectory in ${activeRevenueMeta.value.fullUnit}`;
+  }
+  return '';
+});
+
+// ECharts Options Generator
+const chartOption = computed(() => {
+  const isTonnes = store.filterMetric === 'TONNES';
+  const data = filteredData.value;
+  const slicedData = (topNLimit.value < 999 && (props.chartId === 'chart_commodity_share' || props.chartId === 'chart_market_share'))
+    ? data.slice(0, topNLimit.value)
+    : data;
 
   const toolbox = {
     show: true,
@@ -563,177 +603,35 @@ const chartOption = computed(() => {
     top: '2%',
     feature: {
       saveAsImage: { title: 'Save Image' },
-      restore: { title: 'Reset Zoom' }
+      restore: { title: 'Reset' }
     }
   };
 
-  // Special Handling for PAIRED_BAR Raw vs Processed Comparison Chart
-  const isPairedBar = props.chartId === 'chart_price_jump' || props.chartType === 'PAIRED_BAR' || (dataset.length > 0 && (dataset[0].Raw_Value !== undefined || dataset[0].Raw_Price !== undefined));
-
-  if (isPairedBar && currentType.value === 'BAR') {
-    const rawLegend = isTonnes ? `Raw Commodity (${currentUnit})` : (isK ? 'Raw Commodity ($k USD)' : 'Raw Commodity ($M USD)');
-    const procLegend = isTonnes ? `Processed Product (${currentUnit})` : (isK ? 'Processed Product ($k USD)' : 'Processed Product ($M USD)');
-
-    const formatVal = (v: number): string => {
-      if (isKg) {
-        return `${v.toLocaleString()} kg`;
-      } else if (isTonnes) {
-        if (v === 0) return '0 t';
-        if (v < 1) {
-          const kg = Math.round(v * 1000 * 10) / 10;
-          return `${kg.toLocaleString()} kg`;
-        }
-        if (v >= 1_000_000) return `${(v / 1e6).toFixed(2)}M t`;
-        return `${v.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 1 })} t`;
-      } else if (isK) {
-        if (v === 0) return '$0k';
-        return `$${v.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 1 })}k`;
-      } else {
-        if (v === 0) return '$0M';
-        if (v < 1) {
-          const kUsd = Math.round(v * 1000 * 10) / 10;
-          return `$${kUsd.toLocaleString()}k`;
-        }
-        return `$${v.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}M`;
-      }
-    };
-
-    const categories = dataset.map(d => d.category || d.name);
-    const rawValues = dataset.map(d => d.Raw_Value !== undefined ? d.Raw_Value : (isTonnes ? (d.Raw_Tonnes || 0) : ((d.raw_val_usd ? d.raw_val_usd / (isK ? 1000 : 1e6) : (d.Raw_Val ? d.Raw_Val * (isK ? 1000 : 1) : (d.Raw_Price || 0))))));
-    const procValues = dataset.map(d => d.Processed_Value !== undefined ? d.Processed_Value : (isTonnes ? (d.Processed_Tonnes || 0) : ((d.proc_val_usd ? d.proc_val_usd / (isK ? 1000 : 1e6) : (d.Processed_Val ? d.Processed_Val * (isK ? 1000 : 1) : (d.Processed_Price || 0))))));
+  // 1. DONUT CHART (for HS8 Commodities)
+  if (props.chartId === 'chart_commodity_share' || props.chartType === 'DONUT') {
+    const pieData = slicedData.map(d => ({
+      name: d.name,
+      value: Math.round(((isTonnes ? d.weight_ton : d.val_usd) / unitMeta.value.divisor) * 100) / 100,
+      val_usd: d.val_usd,
+      weight_ton: d.weight_ton,
+      sharePct: d.sharePct
+    }));
 
     return {
       toolbox,
-      legend: {
-        data: [rawLegend, procLegend],
-        bottom: '0%',
-        textStyle: { fontSize: 11, fontWeight: 'bold', color: '#334155' }
-      },
+      color: ['#0284c7', '#10b981', '#6366f1', '#f59e0b', '#ec4899', '#8b5cf6', '#14b8a6', '#f97316', '#3b82f6', '#84cc16'],
       tooltip: {
-        trigger: 'axis',
-        axisPointer: { type: 'shadow' },
-        formatter: (params: any[]) => {
-          const rawItem = params.find(p => p.seriesName === rawLegend);
-          const procItem = params.find(p => p.seriesName === procLegend);
-          const rawVal = rawItem ? rawItem.value : 0;
-          const procVal = procItem ? procItem.value : 0;
-          const totalCat = rawVal + procVal;
-          const procShare = totalCat > 0 ? ((procVal / totalCat) * 100).toFixed(1) : '0';
-          const ratio = rawVal > 0 ? (procVal / rawVal).toFixed(2) : 'N/A';
-
-          return `
-            <div style="font-weight:bold;color:#0f172a;margin-bottom:4px;">${params[0].name}</div>
-            <div style="color:#0284c7;font-size:12px;">🔵 Raw Commodity: <strong>${formatVal(rawVal)}</strong></div>
-            <div style="color:#059669;font-size:12px;margin-top:2px;">🟢 Processed Product: <strong>${formatVal(procVal)}</strong></div>
-            <div style="margin-top:6px;padding-top:4px;border-top:1px solid #e2e8f0;color:#0369a1;font-weight:bold;font-size:11px;">
-              📊 Processed Share: ${procShare}% of category total (${ratio}x of Raw)
-            </div>
-          `;
-        }
-      },
-      grid: { left: '3%', right: '12%', bottom: '14%', top: '8%', containLabel: true },
-      xAxis: { 
-        type: 'value', 
-        splitNumber: 4,
-        splitLine: { lineStyle: { type: 'dashed', color: '#f1f5f9' } },
-        axisLabel: { 
-          fontSize: 10,
-          color: '#64748b',
-          formatter: (v: number) => formatVal(v)
-        }
-      },
-      yAxis: { 
-        type: 'category', 
-        data: categories.slice().reverse(),
-        axisLabel: { 
-          fontWeight: 'bold', 
-          fontSize: 11, 
-          color: '#1e293b',
-          formatter: (val: string) => {
-            if (val.length > 28) {
-              return val.substring(0, 26) + '...';
-            }
-            return val;
-          }
-        }
-      },
-      series: [
-        {
-          name: rawLegend,
-          type: 'bar',
-          data: rawValues.slice().reverse(),
-          itemStyle: { color: '#0284c7', borderRadius: [0, 4, 4, 0] },
-          label: {
-            show: true,
-            position: 'right',
-            formatter: (p: any) => formatVal(p.value),
-            fontSize: 10,
-            color: '#0284c7',
-            fontWeight: 'bold'
-          }
-        },
-        {
-          name: procLegend,
-          type: 'bar',
-          data: procValues.slice().reverse(),
-          itemStyle: { color: '#10b981', borderRadius: [0, 4, 4, 0] },
-          label: {
-            show: true,
-            position: 'right',
-            formatter: (p: any) => formatVal(p.value),
-            fontSize: 10,
-            color: '#059669',
-            fontWeight: 'bold'
-          }
-        }
-      ]
-    };
-  }
-
-  const names = dataset.map(d => d.name || d.category || d.yyyy_mm);
-  const values = dataset.map(d => d.displayValue !== undefined ? d.displayValue : (d.value !== undefined ? d.value : d.Raw_Price));
-
-  if (currentType.value === 'DONUT') {
-    return {
-      toolbox,
-      color: ['#0284c7', '#10b981', '#6366f1', '#f59e0b', '#ec4899', '#8b5cf6', '#14b8a6', '#f97316'],
-      tooltip: { 
-        trigger: 'item', 
+        trigger: 'item',
         formatter: (params: any) => {
-          const raw = dataset.find(d => (d.name || d.country || d.category) === params.name);
-          const fullLabel = raw?.label ? `<div style="color:#64748b;font-size:11px;">${raw.label}</div>` : '';
-          let valFormatted = '';
-          if (isK) {
-            valFormatted = `$${params.value.toLocaleString()}k USD`;
-          } else if (isM) {
-            if (params.value < 1 && params.value > 0) {
-              valFormatted = `$${(Math.round(params.value * 1000 * 10) / 10).toLocaleString()}k USD`;
-            } else {
-              valFormatted = `$${params.value.toLocaleString()}M USD`;
-            }
-          } else if (isKg) {
-            valFormatted = `${params.value.toLocaleString()} kg`;
-          } else if (isTonnes) {
-            if (params.value < 1 && params.value > 0) {
-              valFormatted = `${(Math.round(params.value * 1000 * 10) / 10).toLocaleString()} kg`;
-            } else {
-              valFormatted = `${params.value.toLocaleString()} Tonnes`;
-            }
-          } else {
-            valFormatted = `${params.value.toLocaleString()} ${currentUnit}`;
-          }
-          const globalShareText = raw?.worldSharePct !== undefined 
-            ? `<div style="color:#0284c7;font-size:11px;font-weight:600;margin-top:2px;">🌍 Worldwide Share: ${raw.worldSharePct}%</div>` 
-            : '';
+          const item = params.data;
+          const valText = isTonnes 
+            ? `<strong>${formatVolumeCell(item.weight_ton)}</strong>` 
+            : `<strong>${formatRevenueCell(item.val_usd)}</strong>`;
           return `
-            <div style="font-weight:bold;color:#0f172a;">${params.name}</div>
-            ${fullLabel}
-            <div style="font-weight:bold;color:#0369a1;margin-top:2px;">
-              ${valFormatted} (${params.percent}%)
-            </div>
-            ${globalShareText}
+            <div style="font-weight:bold;color:#0f172a;margin-bottom:2px;">${params.name}</div>
+            <div style="font-size:12px;color:#334155;">📊 ${valText} (${params.percent}%)</div>
           `;
-        } 
+        }
       },
       legend: {
         type: 'scroll',
@@ -743,101 +641,158 @@ const chartOption = computed(() => {
       },
       series: [
         {
+          name: 'Commodity Share',
           type: 'pie',
           radius: ['44%', '68%'],
           center: ['50%', '46%'],
-          minAngle: 12,
+          minAngle: 8,
           avoidLabelOverlap: true,
-          itemStyle: { borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
+          itemStyle: {
+            borderRadius: 6,
+            borderColor: '#fff',
+            borderWidth: 2
+          },
           label: {
             show: true,
             formatter: '{b}: {d}%',
-            fontSize: 11,
-            fontWeight: 'bold',
-            color: '#1e293b'
+            fontSize: 10,
+            color: '#334155'
           },
-          labelLine: {
-            show: true,
-            length: 12,
-            length2: 10,
-            smooth: true
-          },
-          data: dataset.map(d => ({ 
-            name: d.name || d.country || d.category, 
-            value: d.displayValue !== undefined ? d.displayValue : (d.value || d.Raw_Price) 
-          }))
+          data: pieData
         }
       ]
     };
   }
 
-  if (currentType.value === 'LINE') {
+  // 2. HORIZONTAL BAR CHART (for Destination Countries)
+  if (props.chartId === 'chart_market_share' || props.chartType === 'HORIZONTAL_BAR') {
+    const categories = slicedData.map(d => d.name).reverse();
+    const values = slicedData.map(d => 
+      Math.round(((isTonnes ? d.weight_ton : d.val_usd) / unitMeta.value.divisor) * 100) / 100
+    ).reverse();
+
     return {
       toolbox,
-      tooltip: { 
-        trigger: 'axis', 
-        formatter: (params: any) => {
+      grid: { left: '3%', right: '12%', bottom: '8%', top: '6%', containLabel: true },
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: { type: 'shadow' },
+        formatter: (params: any[]) => {
           const p = params[0];
-          let formatted = '';
-          if (isK) {
-            formatted = `$${p.value.toLocaleString()}k USD`;
-          } else if (isM) {
-            if (p.value < 1 && p.value > 0) {
-              formatted = `$${(Math.round(p.value * 1000 * 10) / 10).toLocaleString()}k USD`;
-            } else {
-              formatted = `$${p.value.toLocaleString()}M USD`;
-            }
-          } else if (isKg) {
-            formatted = `${p.value.toLocaleString()} kg`;
-          } else if (isTonnes) {
-            if (p.value < 1 && p.value > 0) {
-              formatted = `${(Math.round(p.value * 1000 * 10) / 10).toLocaleString()} kg`;
-            } else {
-              formatted = `${p.value.toLocaleString()} Tonnes`;
-            }
-          } else {
-            formatted = `${p.value.toLocaleString()} ${currentUnit}`;
-          }
-          return `<div><strong style="color:#0f172a;">${p.name}</strong><div style="color:#0284c7;font-weight:bold;margin-top:4px;">${formatted}</div></div>`;
+          const raw = slicedData.find(d => d.name === p.name);
+          const rawValUSD = raw?.val_usd ?? (isTonnes ? 0 : p.value * unitMeta.value.divisor);
+          const rawWeightTon = raw?.weight_ton ?? (isTonnes ? p.value * unitMeta.value.divisor : 0);
+          const valText = isTonnes 
+            ? `<strong>${formatVolumeCell(rawWeightTon)}</strong>` 
+            : `<strong>${formatRevenueCell(rawValUSD)}</strong>`;
+          const shareText = raw?.sharePct ? `<span style="color:#0284c7;font-weight:bold;"> (${raw.sharePct}% share)</span>` : '';
+          return `
+            <div style="font-weight:bold;color:#0f172a;">${p.name}</div>
+            <div style="font-size:12px;color:#334155;margin-top:2px;">${valText}${shareText}</div>
+          `;
         }
       },
-      grid: { left: '3%', right: '4%', bottom: '14%', top: '10%', containLabel: true },
-      dataZoom: [{ type: 'inside' }, { type: 'slider', height: 16, bottom: '1%' }],
-      xAxis: { type: 'category', data: names, boundaryGap: false, axisLabel: { fontSize: 10, rotate: 30 } },
-      yAxis: { 
-        type: 'value', 
-        name: currentUnit, 
+      xAxis: {
+        type: 'value',
         splitLine: { lineStyle: { type: 'dashed', color: '#f1f5f9' } },
         axisLabel: {
           fontSize: 10,
           color: '#64748b',
-          formatter: (v: number) => {
-            if (isK) return `$${v.toLocaleString()}k`;
-            if (isM) return `$${v}M`;
-            if (isKg) return `${v.toLocaleString()} kg`;
-            if (isTonnes) {
-              if (v >= 1_000_000) return `${(v / 1e6).toFixed(1)}M t`;
-              if (v >= 1000) return `${(v / 1000).toFixed(1)}k t`;
-              return `${v.toLocaleString()} t`;
-            }
-            return `${v.toLocaleString()}`;
-          }
+          formatter: (v: number) => `${unitMeta.value.prefix}${v.toLocaleString()}${unitMeta.value.suffix}`
+        }
+      },
+      yAxis: {
+        type: 'category',
+        data: categories,
+        axisLabel: {
+          fontWeight: 'bold',
+          fontSize: 11,
+          color: '#1e293b'
         }
       },
       series: [
         {
+          name: 'Export Metric',
+          type: 'bar',
           data: values,
+          itemStyle: {
+            color: '#0284c7',
+            borderRadius: [0, 6, 6, 0]
+          },
+          label: {
+            show: true,
+            position: 'right',
+            formatter: (p: any) => `${unitMeta.value.prefix}${p.value.toLocaleString()}${unitMeta.value.suffix}`,
+            fontSize: 10,
+            fontWeight: 'bold',
+            color: '#0369a1'
+          }
+        }
+      ]
+    };
+  }
+
+  // 3. MONTHLY TIMELINE SINGLE-LINE CHART (controlled by Revenue vs. Volume slicer)
+  if (props.chartId === 'chart_seasonality' || props.chartType === 'LINE') {
+    const xDates = data.map(d => d.yyyy_mm);
+    const values = data.map(d => {
+      const rawVal = isTonnes ? (d.weight_ton || 0) : (d.val_usd || 0);
+      return Math.round((rawVal / unitMeta.value.divisor) * 100) / 100;
+    });
+    const metricName = isTonnes ? 'Export Volume' : 'Export Revenue';
+    const yAxisLabel = (v: number) => `${unitMeta.value.prefix}${v.toLocaleString()}${unitMeta.value.suffix}`;
+    const yAxisName = isTonnes ? `Volume (${unitMeta.value.suffix.trim()})` : `Revenue (${unitMeta.value.label})`;
+
+    return {
+      toolbox,
+      grid: { left: '3%', right: '4%', bottom: '8%', top: '12%', containLabel: true },
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: { type: 'line', lineStyle: { color: '#0284c7', type: 'dashed' } },
+        formatter: (params: any[]) => {
+          const p = params[0];
+          const date = p.name;
+          const raw = data.find(d => d.yyyy_mm === date);
+          const rawValUSD = raw?.val_usd ?? (isTonnes ? 0 : p.value * unitMeta.value.divisor);
+          const rawWeightTon = raw?.weight_ton ?? (isTonnes ? p.value * unitMeta.value.divisor : 0);
+          const valDisplay = isTonnes ? formatVolumeCell(rawWeightTon) : formatRevenueCell(rawValUSD);
+          return `
+            <div style="font-weight:bold;color:#0f172a;margin-bottom:3px;">${date}</div>
+            <div style="font-size:12px;color:#334155;">📈 ${metricName}: <strong>${valDisplay}</strong></div>
+          `;
+        }
+      },
+      xAxis: {
+        type: 'category',
+        data: xDates,
+        boundaryGap: false,
+        axisLine: { lineStyle: { color: '#cbd5e1' } },
+        axisLabel: { fontSize: 10, color: '#64748b' }
+      },
+      yAxis: {
+        type: 'value',
+        name: yAxisName,
+        nameTextStyle: { fontSize: 10, color: '#64748b', fontWeight: 'bold' },
+        splitLine: { lineStyle: { type: 'dashed', color: '#f1f5f9' } },
+        axisLabel: { fontSize: 10, color: '#64748b', formatter: yAxisLabel }
+      },
+      series: [
+        {
+          name: metricName,
           type: 'line',
+          data: values,
           smooth: true,
-          lineStyle: { width: 3, color: '#0284c7' },
+          showSymbol: true,
+          symbolSize: 6,
           itemStyle: { color: '#0284c7' },
+          lineStyle: { width: 3, color: '#0284c7' },
           areaStyle: {
             color: {
               type: 'linear',
               x: 0, y: 0, x2: 0, y2: 1,
               colorStops: [
-                { offset: 0, color: 'rgba(2, 132, 199, 0.35)' },
-                { offset: 1, color: 'rgba(2, 132, 199, 0.02)' }
+                { offset: 0, color: 'rgba(2, 132, 199, 0.25)' },
+                { offset: 1, color: 'rgba(2, 132, 199, 0.01)' }
               ]
             }
           }
@@ -846,102 +801,6 @@ const chartOption = computed(() => {
     };
   }
 
-  // BAR (Default)
-  return {
-    toolbox,
-    tooltip: { 
-      trigger: 'axis', 
-      axisPointer: { type: 'shadow' },
-      formatter: (params: any) => {
-        const p = params[0];
-        const rawData = dataset.find(d => (d.name || d.category) === p.name);
-        const descLabel = rawData?.label ? `<div style="color:#475569;font-size:11px;margin-top:2px;">${rawData.label}</div>` : '';
-        let formatted = '';
-        if (isK) {
-          formatted = `$${p.value.toLocaleString()}k USD`;
-        } else if (isM) {
-          if (p.value < 1 && p.value > 0) {
-            formatted = `$${(Math.round(p.value * 1000 * 10) / 10).toLocaleString()}k USD`;
-          } else {
-            formatted = `$${p.value.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}M USD`;
-          }
-        } else if (isKg) {
-          formatted = `${p.value.toLocaleString()} kg`;
-        } else if (isTonnes) {
-          if (p.value < 1 && p.value > 0) {
-            formatted = `${(Math.round(p.value * 1000 * 10) / 10).toLocaleString()} kg`;
-          } else {
-            formatted = `${p.value.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 1 })} Tonnes`;
-          }
-        } else {
-          formatted = `${p.value.toLocaleString()} ${currentUnit}`;
-        }
-        return `<div><strong style="color:#0f172a;">${p.name}</strong>${descLabel}<div style="color:#0284c7;font-weight:bold;margin-top:4px;">${formatted}</div></div>`;
-      }
-    },
-    xAxis: { 
-      type: 'value', 
-      splitNumber: 4,
-      splitLine: { lineStyle: { type: 'dashed', color: '#f1f5f9' } },
-      axisLabel: { 
-        fontSize: 10,
-        color: '#64748b',
-        formatter: (v: number) => {
-          if (isK) return `$${v.toLocaleString()}k`;
-          if (isM) return `$${v}M`;
-          if (isKg) return `${v.toLocaleString()} kg`;
-          if (isTonnes) {
-            if (v >= 1_000_000) return `${(v / 1e6).toFixed(1)}M t`;
-            if (v >= 1000) return `${(v / 1000).toFixed(1)}k t`;
-            return `${v.toLocaleString()} t`;
-          }
-          return `${v.toLocaleString()} t`;
-        }
-      }
-    },
-    yAxis: { 
-      type: 'category', 
-      data: names.slice(0, 10).reverse(),
-      axisLabel: { fontSize: 11, fontWeight: 'bold', color: '#334155' }
-    },
-    series: [
-      {
-        data: values.slice(0, 10).reverse(),
-        type: 'bar',
-        itemStyle: { 
-          color: {
-            type: 'linear',
-            x: 0, y: 0, x2: 1, y2: 0,
-            colorStops: [
-              { offset: 0, color: '#0284c7' },
-              { offset: 1, color: '#38bdf8' }
-            ]
-          },
-          borderRadius: [0, 6, 6, 0] 
-        },
-        label: {
-          show: true,
-          position: 'right',
-          formatter: (p: any) => {
-            if (isK) return `$${p.value}k`;
-            if (isM) {
-              if (p.value < 1 && p.value > 0) return `$${Math.round(p.value * 1000 * 10) / 10}k`;
-              return `$${p.value}M`;
-            }
-            if (isKg) return `${p.value} kg`;
-            if (isTonnes) {
-              if (p.value < 1 && p.value > 0) return `${Math.round(p.value * 1000 * 10) / 10} kg`;
-              if (p.value >= 1_000_000) return `${(p.value / 1e6).toFixed(2)}M t`;
-              return `${p.value.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 1 })} t`;
-            }
-            return `${p.value}`;
-          },
-          fontSize: 10,
-          fontWeight: 'bold',
-          color: '#0369a1'
-        }
-      }
-    ]
-  };
+  return {};
 });
 </script>

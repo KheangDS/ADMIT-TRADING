@@ -48,7 +48,9 @@ function createInitialDashboardPayload(): DashboardPayload {
         description: 'Active 8-digit tariff line products'
       }
     ],
+    hs8_commodities: [],
     hs4_categories: [],
+    market_share_table: [],
     level1_charts: [],
     hhi_risk_score: 0.0,
     is_high_risk: false,
@@ -68,13 +70,27 @@ export const useDatasetStore = defineStore('dataset', () => {
   
   // 4-Pillar Interactive Slicer & Filter States
   const filterHsCode = ref<string>('ALL');
+  const filterHsCodes = ref<string[]>([]); // Multi-select HS8 codes (empty array = All)
   const filterYear = ref<string>('ALL');
   const filterCountry = ref<string>('ALL');
   const filterMetric = ref<'USD' | 'TONNES'>('USD');
   const topNLimit = ref<number>(5);
 
+  const isSingleCommoditySelected = computed<boolean>(() => {
+    if (filterHsCodes.value.length === 1) return true;
+    if (filterHsCodes.value.length === 0 && filterHsCode.value !== 'ALL') return true;
+    return false;
+  });
+
+  const selectedSingleHsCode = computed<string | null>(() => {
+    if (filterHsCodes.value.length === 1) return filterHsCodes.value[0];
+    if (filterHsCodes.value.length === 0 && filterHsCode.value !== 'ALL') return filterHsCode.value;
+    return null;
+  });
+
   const isFiltered = computed(() => {
     return (
+      filterHsCodes.value.length > 0 ||
       filterHsCode.value !== 'ALL' ||
       filterYear.value !== 'ALL' ||
       filterCountry.value !== 'ALL' ||
@@ -84,6 +100,7 @@ export const useDatasetStore = defineStore('dataset', () => {
 
   function resetAllFilters() {
     filterHsCode.value = 'ALL';
+    filterHsCodes.value = [];
     filterYear.value = 'ALL';
     filterCountry.value = 'ALL';
     filterMetric.value = 'USD';
@@ -195,8 +212,6 @@ export const useDatasetStore = defineStore('dataset', () => {
 
   function askAboutChart(chartTitle: string, chartMeaningText?: string) {
     isChatOpen.value = true;
-    const contextInfo = chartMeaningText ? ` (Context: ${chartMeaningText})` : '';
-    const promptText = `Can you explain the key insights, economic drivers, and recommended roadmap for the graph "${chartTitle}"${contextInfo} based strictly on the trade dataset?`;
     const contextInfo = chartMeaningText ? ` (Visual Context: ${chartMeaningText})` : '';
     const promptText = `As a Senior Data Analyst, please explain the key data insights and analytical breakdown for the chart "${chartTitle}"${contextInfo} based strictly on the trade dataset.`;
     postChatMessage(promptText);
@@ -211,6 +226,9 @@ export const useDatasetStore = defineStore('dataset', () => {
     isChatProcessing,
     chatMessages,
     filterHsCode,
+    filterHsCodes,
+    isSingleCommoditySelected,
+    selectedSingleHsCode,
     filterYear,
     filterCountry,
     filterMetric,

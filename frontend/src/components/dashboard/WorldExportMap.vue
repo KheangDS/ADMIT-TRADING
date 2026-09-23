@@ -1,6 +1,6 @@
 <template>
   <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between">
-    <!-- Header with Metric Toggle -->
+    <!-- Header with Metric Toggle & Unit Scale -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-100">
       <div>
         <div class="flex items-center gap-2">
@@ -14,27 +14,29 @@
         </p>
       </div>
 
-      <!-- Metric Switcher: Volume vs Revenue -->
+      <!-- Metric Switcher: Volume vs Revenue with Unit Scales -->
       <div class="flex items-center bg-slate-100 p-1 rounded-xl self-start sm:self-auto">
         <button
           @click="activeMetric = 'VOLUME'"
           class="px-3 py-1 text-xs font-bold rounded-lg transition-all"
           :class="activeMetric === 'VOLUME' ? 'bg-white text-sky-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'"
+          title="Scale: kg / Metric Tonnes"
         >
-          📦 Volume (បរិមាណ)
+          📦 Volume (Tonnes/kg)
         </button>
         <button
           @click="activeMetric = 'REVENUE'"
           class="px-3 py-1 text-xs font-bold rounded-lg transition-all"
           :class="activeMetric === 'REVENUE' ? 'bg-white text-sky-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'"
+          title="Scale: $k / $M USD"
         >
-          💰 Revenue (ចំណូល $)
+          💰 Revenue ($USD)
         </button>
       </div>
     </div>
 
     <!-- ECharts Container -->
-    <div class="relative w-full h-[400px] sm:h-[480px] rounded-xl overflow-hidden bg-slate-950 border border-slate-800">
+    <div class="relative w-full h-[420px] sm:h-[500px] rounded-xl overflow-hidden bg-slate-950 border border-slate-800">
       <!-- Cambodia Hub Badge -->
       <div class="absolute top-3 left-3 z-10 bg-slate-900/90 backdrop-blur-xs px-3 py-1.5 rounded-xl border border-slate-700 text-xs text-slate-200 flex items-center gap-2 shadow-md">
         <span class="relative flex h-2.5 w-2.5">
@@ -47,16 +49,70 @@
 
       <!-- Active Metric Legend Badge -->
       <div class="absolute top-3 right-3 z-10 bg-slate-900/90 backdrop-blur-xs px-3 py-1.5 rounded-xl border border-slate-700 text-xs text-slate-300 shadow-md">
-        <span class="text-slate-400">Displaying: </span>
+        <span class="text-slate-400">Scale: </span>
         <strong :class="activeMetric === 'VOLUME' ? 'text-sky-400' : 'text-amber-400'">
-          {{ activeMetric === 'VOLUME' ? '📦 Export Volume' : '💰 Export Revenue ($USD)' }}
+          {{ activeMetric === 'VOLUME' ? '📦 Volume (kg / Tonnes)' : '💰 Value ($k / $M USD)' }}
         </strong>
+      </div>
+
+      <!-- In-Map Country Intelligence Floating Card (Triggered by Map Click) -->
+      <div
+        v-if="selectedCountry"
+        class="absolute bottom-4 left-4 z-20 bg-slate-900/95 backdrop-blur-md border border-slate-700 p-4 rounded-xl shadow-2xl text-white max-w-xs w-full transition-all animate-in fade-in"
+      >
+        <div class="flex items-center justify-between pb-2 border-b border-slate-800 mb-2.5">
+          <div class="flex items-center gap-2">
+            <span class="text-xl">{{ getCountryFlag(selectedCountry.country) }}</span>
+            <div>
+              <h4 class="font-bold text-sm text-white leading-tight">
+                {{ getDisplayCountryName(selectedCountry.country) }}
+              </h4>
+              <span class="text-[10px] text-slate-400 font-sans">Destination Partner</span>
+            </div>
+          </div>
+          <button
+            @click="selectedCountry = null"
+            class="w-6 h-6 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-xs font-bold"
+            title="Close country details"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div class="space-y-2 text-xs">
+          <div class="flex items-center justify-between bg-slate-800/60 p-2 rounded-lg border border-slate-700/50">
+            <span class="text-slate-400">Export Revenue:</span>
+            <div class="text-right">
+              <strong class="text-amber-400 font-bold block">{{ formatRevenueUsd(selectedCountry.val_usd) }}</strong>
+              <span class="text-[10px] text-emerald-400 font-semibold">{{ countrySharePct(selectedCountry) }}% Share</span>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between bg-slate-800/60 p-2 rounded-lg border border-slate-700/50">
+            <span class="text-slate-400">Export Volume:</span>
+            <strong class="text-sky-300 font-bold">{{ formatVolumeKg(selectedCountry.weight_kg) }}</strong>
+          </div>
+
+          <!-- Country-Specific Average Price -->
+          <div class="flex items-center justify-between bg-emerald-950/40 p-2 rounded-lg border border-emerald-800/40">
+            <span class="text-emerald-300 font-semibold">Country Avg Price:</span>
+            <div class="text-right">
+              <strong class="text-emerald-400 font-mono font-bold block">
+                ${{ countryAvgPriceUsd(selectedCountry) }}/kg
+              </strong>
+              <span class="text-[10px] text-slate-400">
+                ({{ countryAvgPriceKhr(selectedCountry) }} ៛/kg)
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
 
       <v-chart
         ref="chartRef"
-        class="w-full h-full"
+        class="w-full h-full cursor-pointer"
         :option="mapChartOption"
+        @click="onMapClick"
         autoresize
       />
     </div>
@@ -65,13 +121,15 @@
     <div class="mt-4 pt-3 border-t border-slate-100">
       <div class="flex items-center justify-between text-xs text-slate-500 mb-2">
         <span class="font-semibold text-slate-700">Top Destination Markets ({{ marketData.length }} countries):</span>
-        <span class="text-[11px] text-slate-400">Hover country on map for trade statistics</span>
+        <span class="text-[11px] text-slate-400">Click country to view inside-map intelligence</span>
       </div>
       <div class="flex flex-wrap gap-2">
-        <div
+        <button
           v-for="mkt in marketData.slice(0, 10)"
           :key="mkt.country"
-          class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200/80 text-xs"
+          @click="selectedCountry = mkt"
+          class="cursor-pointer flex items-center gap-1.5 px-2.5 py-1 rounded-lg border transition-all text-xs text-left"
+          :class="selectedCountry?.country === mkt.country ? 'bg-sky-50 border-sky-300 ring-2 ring-sky-400/30' : 'bg-slate-50 border-slate-200/80 hover:bg-slate-100'"
         >
           <span class="font-bold text-slate-800">{{ getCountryFlag(mkt.country) }} {{ getDisplayCountryName(mkt.country) }}</span>
           <span class="text-slate-400">|</span>
@@ -79,9 +137,9 @@
             {{ activeMetric === 'VOLUME' ? formatVolumeKg(mkt.weight_kg) : formatRevenueUsd(mkt.val_usd) }}
           </span>
           <span class="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
-            {{ mkt.share_pct ? mkt.share_pct.toFixed(1) : ((mkt.val_usd / Math.max(1, totalValUsd)) * 100).toFixed(1) }}%
+            {{ countrySharePct(mkt) }}%
           </span>
-        </div>
+        </button>
       </div>
     </div>
   </div>
@@ -104,6 +162,12 @@ import VChart from 'vue-echarts';
 import { Globe as GlobeIcon } from 'lucide-vue-next';
 import worldGeoJson from '../../assets/world.json';
 import type { MarketBreakdownItem } from '../../types/dataset';
+import {
+  getCountryMeta,
+  getCountryFlag,
+  getDisplayCountryName,
+  CAMBODIA_COORDS
+} from '../../utils/countryRegistry';
 
 // Register standard Apache ECharts world map GeoJSON
 echarts.registerMap('world', worldGeoJson as any);
@@ -129,103 +193,30 @@ const props = defineProps<{
 }>();
 
 const activeMetric = ref<'VOLUME' | 'REVENUE'>('VOLUME');
+const selectedCountry = ref<MarketBreakdownItem | null>(null);
 
-// Complete Dictionary: Khmer Country Names -> English Standard Name + GPS Coordinates + Flag
-interface CountryMeta {
-  en: string;
-  coords: [number, number];
-  flag: string;
-}
 
-const COUNTRY_REGISTRY: Record<string, CountryMeta> = {
-  // Khmer Names from dataset
-  'វៀតណាម': { en: 'Vietnam', coords: [106.6297, 10.8231], flag: '🇻🇳' },
-  'ចិន': { en: 'China', coords: [116.4074, 39.9042], flag: '🇨🇳' },
-  'ថៃ': { en: 'Thailand', coords: [100.5018, 13.7563], flag: '🇹🇭' },
-  'ឥណ្ឌា': { en: 'India', coords: [77.2090, 28.6139], flag: '🇮🇳' },
-  'ជប៉ុន': { en: 'Japan', coords: [139.6917, 35.6895], flag: '🇯🇵' },
-  'កូរ៉េខាងត្បូង': { en: 'South Korea', coords: [126.9780, 37.5665], flag: '🇰🇷' },
-  'កូរ៉េ': { en: 'South Korea', coords: [126.9780, 37.5665], flag: '🇰🇷' },
-  'តៃវ៉ាន់': { en: 'Taiwan', coords: [121.5654, 25.0330], flag: '🇹🇼' },
-  'អាមេរិក (សហរដ្ឋ)': { en: 'United States', coords: [-95.7129, 37.0902], flag: '🇺🇸' },
-  'សហរដ្ឋអាមេរិក': { en: 'United States', coords: [-95.7129, 37.0902], flag: '🇺🇸' },
-  'បារាំង': { en: 'France', coords: [2.3522, 48.8566], flag: '🇫🇷' },
-  'អាល្លឺម៉ង់': { en: 'Germany', coords: [13.4050, 52.5200], flag: '🇩🇪' },
-  'ហូឡង់': { en: 'Netherlands', coords: [4.9041, 52.3676], flag: '🇳🇱' },
-  'ហ្វាំងឡង់': { en: 'Finland', coords: [25.7482, 61.9241], flag: '🇫🇮' },
-  'អង់គ្លេស (ចក្រភព)': { en: 'United Kingdom', coords: [-0.1278, 51.5074], flag: '🇬🇧' },
-  'អង់គ្លេស': { en: 'United Kingdom', coords: [-0.1278, 51.5074], flag: '🇬🇧' },
-  'កាណាដា': { en: 'Canada', coords: [-75.6972, 45.4215], flag: '🇨🇦' },
-  'អូស្ត្រាលី': { en: 'Australia', coords: [149.1300, -35.2809], flag: '🇦🇺' },
-  'ម៉ាឡេស៊ី': { en: 'Malaysia', coords: [101.6869, 3.1390], flag: '🇲🇾' },
-  'សិង្ហបុរី': { en: 'Singapore', coords: [103.8198, 1.3521], flag: '🇸🇬' },
-  'ហ៊្វីលីពីន': { en: 'Philippines', coords: [120.9842, 14.5995], flag: '🇵🇭' },
-  'ហុងកុង': { en: 'Hong Kong', coords: [114.1694, 22.3193], flag: '🇭🇰' },
-  'រុស្ស៊ី': { en: 'Russia', coords: [37.6173, 55.7558], flag: '🇷🇺' },
-  'ស្វ៊ីស': { en: 'Switzerland', coords: [7.4474, 46.9480], flag: '🇨🇭' },
-  'បែលហ្ស៊ិក': { en: 'Belgium', coords: [4.3517, 50.8503], flag: '🇧🇪' },
-  'អេស្ប៉ាញ': { en: 'Spain', coords: [-3.7038, 40.4168], flag: '🇪🇸' },
-  'អ៊ីតាលី': { en: 'Italy', coords: [12.4964, 41.9028], flag: '🇮🇹' },
-  'ប៉ូឡូញ': { en: 'Poland', coords: [21.0122, 52.2297], flag: '🇵🇱' },
-  'ដាណឺម៉ាក': { en: 'Denmark', coords: [12.5683, 55.6761], flag: '🇩🇰' },
-  'ន័រវែស': { en: 'Norway', coords: [10.7522, 59.9139], flag: '🇳🇴' },
-  'ស៊ុយអែត': { en: 'Sweden', coords: [18.0686, 59.3293], flag: '🇸🇪' },
-  'ឆែក (សាធារណរដ្ឋ)': { en: 'Czech Republic', coords: [14.4378, 50.0755], flag: '🇨🇿' },
-  'ហុងគ្រី': { en: 'Hungary', coords: [19.0402, 47.4979], flag: '🇭🇺' },
-  'អូទ្រីស': { en: 'Austria', coords: [16.3738, 48.2082], flag: '🇦🇹' },
-  'ក្រូអាស៊ី': { en: 'Croatia', coords: [15.9819, 45.8150], flag: '🇭🇷' },
-  'ព័រទុយហ្គាល់': { en: 'Portugal', coords: [-9.1393, 38.7223], flag: '🇵🇹' },
-  'លីទុយអានី': { en: 'Lithuania', coords: [25.2797, 54.6872], flag: '🇱🇹' },
-  'អៀរឡង់': { en: 'Ireland', coords: [-6.2603, 53.3498], flag: '🇮🇪' },
-  'នូវែលសេឡង់': { en: 'New Zealand', coords: [174.7633, -36.8485], flag: '🇳🇿' },
-  'កាហ្សាក់ស្ថាន': { en: 'Kazakhstan', coords: [71.4491, 51.1694], flag: '🇰🇿' },
-  'បង់ក្លាដែស': { en: 'Bangladesh', coords: [90.4125, 23.8103], flag: '🇧🇩' },
-  'អ៊ីស្រាអែល': { en: 'Israel', coords: [35.2137, 31.7683], flag: '🇮🇱' },
-  'ហ្កាណា': { en: 'Ghana', coords: [-0.1870, 5.6037], flag: '🇬🇭' },
-  'ម៉ាលី': { en: 'Mali', coords: [-8.0029, 12.6392], flag: '🇲🇱' },
-  'ស្វាស៊ីឡង់': { en: 'Eswatini', coords: [31.1367, -26.4194], flag: '🇸🇿' },
-  'កម្ពុជា': { en: 'Cambodia', coords: [104.9282, 11.5564], flag: '🇰🇭' },
-
-  // English fallback aliases
-  'Vietnam': { en: 'Vietnam', coords: [106.6297, 10.8231], flag: '🇻🇳' },
-  'China': { en: 'China', coords: [116.4074, 39.9042], flag: '🇨🇳' },
-  'Thailand': { en: 'Thailand', coords: [100.5018, 13.7563], flag: '🇹🇭' },
-  'India': { en: 'India', coords: [77.2090, 28.6139], flag: '🇮🇳' },
-  'Japan': { en: 'Japan', coords: [139.6917, 35.6895], flag: '🇯🇵' },
-  'United States': { en: 'United States', coords: [-95.7129, 37.0902], flag: '🇺🇸' },
-  'USA': { en: 'United States', coords: [-95.7129, 37.0902], flag: '🇺🇸' },
-  'France': { en: 'France', coords: [2.3522, 48.8566], flag: '🇫🇷' },
-  'Finland': { en: 'Finland', coords: [25.7482, 61.9241], flag: '🇫🇮' },
-  'Germany': { en: 'Germany', coords: [13.4050, 52.5200], flag: '🇩🇪' },
-  'Netherlands': { en: 'Netherlands', coords: [4.9041, 52.3676], flag: '🇳🇱' },
-  'United Kingdom': { en: 'United Kingdom', coords: [-0.1278, 51.5074], flag: '🇬🇧' },
-  'UK': { en: 'United Kingdom', coords: [-0.1278, 51.5074], flag: '🇬🇧' },
-  'Cambodia': { en: 'Cambodia', coords: [104.9282, 11.5564], flag: '🇰🇭' },
-};
-
-const CAMBODIA_COORDS: [number, number] = [104.9282, 11.5564];
-
-const getCountryMeta = (rawName: string): CountryMeta => {
-  const clean = rawName.trim();
-  if (COUNTRY_REGISTRY[clean]) return COUNTRY_REGISTRY[clean];
-  for (const k in COUNTRY_REGISTRY) {
-    if (clean.includes(k) || k.includes(clean)) return COUNTRY_REGISTRY[k];
-  }
-  return { en: rawName, coords: [100.0, 20.0], flag: '🌐' };
-};
-
-const getCountryFlag = (name: string): string => {
-  return getCountryMeta(name).flag;
-};
-
-const getDisplayCountryName = (name: string): string => {
-  const meta = getCountryMeta(name);
-  return meta.en !== name ? `${meta.en} (${name})` : name;
-};
 
 const totalValUsd = computed(() => {
   return (props.marketData || []).reduce((acc, m) => acc + (m.val_usd || 0), 0);
 });
+
+const countrySharePct = (m: MarketBreakdownItem): string => {
+  if (m.share_pct) return m.share_pct.toFixed(1);
+  return ((m.val_usd / Math.max(1, totalValUsd.value)) * 100).toFixed(1);
+};
+
+const countryAvgPriceUsd = (m: MarketBreakdownItem): string => {
+  if (!m || !m.weight_kg || m.weight_kg <= 0) return '0.00';
+  return (m.val_usd / m.weight_kg).toFixed(2);
+};
+
+const countryAvgPriceKhr = (m: MarketBreakdownItem): string => {
+  if (!m || !m.weight_kg || m.weight_kg <= 0) return '0';
+  const rate = props.exchangeRate || 4000;
+  const khr = m.val_khr ? (m.val_khr / m.weight_kg) : ((m.val_usd * rate) / m.weight_kg);
+  return Math.round(khr).toLocaleString();
+};
 
 const formatRevenueUsd = (valUsd: number): string => {
   if (!valUsd || valUsd === 0) return '$0 USD';
@@ -243,6 +234,23 @@ const formatVolumeKg = (kg: number): string => {
     return `${Math.round(kg).toLocaleString()} kg`;
   }
   return `${(Math.round(tonnes * 10) / 10).toLocaleString()} Tonnes`;
+};
+
+const onMapClick = (params: any) => {
+  if (params.data?.rawMarket) {
+    selectedCountry.value = params.data.rawMarket;
+  } else if (params.name) {
+    const matched = props.marketData.find(m => {
+      const meta = getCountryMeta(m.country);
+      return m.country === params.name || 
+             meta.en.toLowerCase() === params.name.toLowerCase() ||
+             params.name.includes(meta.en) ||
+             params.name.includes(m.country);
+    });
+    if (matched) {
+      selectedCountry.value = matched;
+    }
+  }
 };
 
 // Compute ECharts Option with registered 'world' GeoJSON
@@ -265,19 +273,30 @@ const mapChartOption = computed(() => {
     .map(m => {
       const meta = getCountryMeta(m.country);
       const val = activeMetric.value === 'VOLUME' ? m.weight_kg : m.val_usd;
-      const size = Math.max(12, Math.min(42, Math.sqrt(val / maxVal) * 38));
+      const size = Math.max(14, Math.min(42, Math.sqrt(val / maxVal) * 38));
       return {
         name: `${meta.flag} ${meta.en} (${m.country})`,
         value: [meta.coords[0], meta.coords[1], val],
         symbolSize: size,
         rawMarket: m,
         meta,
+        label: {
+          show: true,
+          formatter: () => `${meta.flag} ${meta.en}`,
+          position: 'top',
+          color: '#f8fafc',
+          fontSize: 10,
+          fontWeight: 'bold',
+          textBorderColor: '#090d16',
+          textBorderWidth: 3,
+          distance: 6,
+        },
         itemStyle: {
           color: activeMetric.value === 'VOLUME' ? '#38bdf8' : '#fbbf24',
           borderColor: '#ffffff',
           borderWidth: 1.5,
-          shadowBlur: 12,
-          shadowColor: activeMetric.value === 'VOLUME' ? 'rgba(56, 189, 248, 0.7)' : 'rgba(251, 191, 36, 0.7)',
+          shadowBlur: 14,
+          shadowColor: activeMetric.value === 'VOLUME' ? 'rgba(56, 189, 248, 0.8)' : 'rgba(251, 191, 36, 0.8)',
         },
       };
     });
@@ -317,9 +336,9 @@ const mapChartOption = computed(() => {
         if (!m) return params.name;
         const flag = meta?.flag || '🌐';
         const enName = meta?.en || m.country;
-        const share = m.share_pct ? m.share_pct.toFixed(1) : ((m.val_usd / Math.max(1, totalValUsd.value)) * 100).toFixed(1);
-        const unitPriceUsd = (m.val_usd / Math.max(1, m.weight_kg)).toFixed(2);
-        const unitPriceKhr = Math.round(m.val_khr ? (m.val_khr / Math.max(1, m.weight_kg)) : (m.val_usd * (props.exchangeRate || 4000) / Math.max(1, m.weight_kg)));
+        const share = countrySharePct(m);
+        const unitPriceUsd = countryAvgPriceUsd(m);
+        const unitPriceKhr = countryAvgPriceKhr(m);
 
         return `
           <div class="p-1 space-y-1.5 min-w-[220px]">
@@ -340,8 +359,8 @@ const mapChartOption = computed(() => {
                 <strong class="text-amber-300 font-bold">${formatRevenueUsd(m.val_usd)}</strong>
               </div>
               <div class="flex justify-between border-t border-slate-800 pt-1">
-                <span class="text-slate-400">Avg Unit Price:</span>
-                <strong class="text-emerald-400 font-mono font-bold">$${unitPriceUsd}/kg <span class="text-[11px] text-slate-400 font-sans">(${unitPriceKhr.toLocaleString()} ៛)</span></strong>
+                <span class="text-slate-400">Country Avg Price:</span>
+                <strong class="text-emerald-400 font-mono font-bold">$${unitPriceUsd}/kg <span class="text-[11px] text-slate-400 font-sans">(${unitPriceKhr} ៛)</span></strong>
               </div>
             </div>
           </div>
@@ -351,8 +370,8 @@ const mapChartOption = computed(() => {
     geo: {
       map: 'world',
       roam: true,
-      zoom: 1.35,
-      center: [90, 25],
+      zoom: 1.18,
+      center: [55, 20],
       label: {
         show: false,
         emphasis: {
