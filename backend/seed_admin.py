@@ -6,7 +6,6 @@ Before seeding, all existing admin and superadmin accounts are purged to ensure 
 
 Usage:
     python seed_admin.py
-    python seed_admin.py --email admin@agritrade.gov.kh --password YourSecretPassword --name "Super Administrator"
 """
 import argparse
 import sys
@@ -41,10 +40,10 @@ def seed_admin(email: str | None = None, password: str | None = None, name: str 
     role = "superadmin"
 
     if not email:
-        print("❌ Error: Admin email is required. Configure ADMIN_EMAIL in .env or pass --email.")
+        print(" Error: Admin email is required. Configure ADMIN_EMAIL in .env or pass --email.")
         sys.exit(1)
     if len(password) < 8:
-        print("❌ Error: Admin password must be at least 8 characters long. Configure ADMIN_PASSWORD in .env or pass --password.")
+        print(" Error: Admin password must be at least 8 characters long. Configure ADMIN_PASSWORD in .env or pass --password.")
         sys.exit(1)
 
     db_target = settings.DATABASE_URL.split("@")[-1] if "@" in settings.DATABASE_URL else "Database"
@@ -55,7 +54,7 @@ def seed_admin(email: str | None = None, password: str | None = None, name: str 
             # 1. Locate and remove all existing admin and superadmin users to avoid conflicts
             existing_admins = db.scalars(select(User).where(User.role.in_(["admin", "superadmin"]))).all()
             if existing_admins:
-                print(f"🧹 Purging {len(existing_admins)} existing admin/superadmin account(s) to avoid conflicts...")
+                print(f"Purging {len(existing_admins)} existing admin/superadmin account(s) to avoid conflicts...")
                 for old_admin in existing_admins:
                     # Clear audit foreign key references to this user
                     db.execute(update(AuditEvent).where(AuditEvent.actor_id == old_admin.id).values(actor_id=None))
@@ -109,14 +108,14 @@ def seed_admin(email: str | None = None, password: str | None = None, name: str 
             db.flush()
 
             audit(db, None, "account.seed_admin", "user", user.id, {"provisioned_by": "seed_admin_script", "role": role})
-            print(f"✅ Created fresh {role} account:")
+            print(f"Created fresh {role} account:")
             print(f"   • Name:     {name}")
             print(f"   • Email:    {email}")
             print(f"   • Role:     {role}")
 
-        print("\n🎉 Superadministrator account is seeded successfully! You can log in at http://localhost:5174\n")
+        # print("\n Superadministrator account is seeded successfully! You can log in at http://localhost:5174\n")
     except Exception as e:
-        print(f"\n❌ Database error while seeding admin: {e}")
+        print(f"\n Database error while seeding admin: {e}")
         print("   Make sure the database is running and migrations are applied (python -m alembic upgrade head).")
         sys.exit(1)
 

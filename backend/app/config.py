@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     VERSION: str = "1.0.0"
     API_V1_STR: str = "/api/v1"
     ENVIRONMENT: str = "development"
+    ENABLE_DOCS: bool = False
     DATABASE_URL: str = ""
     SESSION_COOKIE_NAME: str = "agritrade_session"
     ADMIN_SESSION_COOKIE_NAME: str = "agritrade_admin_session"

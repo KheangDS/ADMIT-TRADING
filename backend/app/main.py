@@ -87,8 +87,16 @@ from fastapi.middleware.gzip import GZipMiddleware
 import time
 import uuid
 
-app = FastAPI(title=settings.PROJECT_NAME, version=settings.VERSION,
-              openapi_url=f"{settings.API_V1_STR}/openapi.json", lifespan=lifespan)
+docs_enabled = settings.ENABLE_DOCS or (settings.ENVIRONMENT != "production")
+
+app = FastAPI(
+    title=settings.PROJECT_NAME,
+    version=settings.VERSION,
+    openapi_url=f"{settings.API_V1_STR}/openapi.json" if docs_enabled else None,
+    docs_url="/docs" if docs_enabled else None,
+    redoc_url="/redoc" if docs_enabled else None,
+    lifespan=lifespan
+)
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.add_middleware(RequestBodyLimitMiddleware)
 app.add_middleware(CORSMiddleware, allow_origins=settings.CORS_ORIGINS,
