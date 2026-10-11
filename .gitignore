@@ -61,9 +61,12 @@ Thumbs.db
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
-.pi-subagents
+# Raw datasets & spreadsheets (Private trade data)
+*.xlsx
+*.xls
+*.csv
 Dataset.xlsx
+/CamFeia 2024-2026(JUN).xlsx
 docs/
 
 /CAMFEIA_WIDGET_INTEGRATION_GUIDE.md
-/CamFeia 2024-2026(JUN).xlsx

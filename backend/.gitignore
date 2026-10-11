@@ -16,3 +16,6 @@ private/
 *.tmp
 *.duckdb
 *.duckdb.wal
+*.xlsx
+*.xls
+*.csv
