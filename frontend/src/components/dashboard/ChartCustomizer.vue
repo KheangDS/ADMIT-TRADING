@@ -15,7 +15,7 @@
           <button
             @click="store.askAboutChart(title, aiMeaning?.explanation)"
             class="cursor-pointer flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-600 hover:to-indigo-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all"
-            title="Ask AI to analyze this graph"
+            title="Ask AI to analyze this graph (Coming Soon)"
           >
             <SparklesIcon class="w-3.5 h-3.5" />
             <span>Ask AI</span>
@@ -122,7 +122,7 @@
       </div>
 
       <!-- Content Container -->
-      <div class="h-64 w-full relative">
+      <div class="h-72 sm:h-80 w-full relative">
         <!-- Empty State -->
         <div 
           v-if="filteredData.length === 0" 
@@ -168,13 +168,13 @@
                   {{ formatVolumeCell(row.weight_ton) }}
                 </td>
                 <td class="py-2 px-3 text-right font-bold text-sky-700">
-                  {{ (row.volume_share_pct || 0).toFixed(1) }}%
+                  {{ (row.volume_share_pct || 0) > 0 && (row.volume_share_pct || 0) < 0.05 ? '<0.1%' : `${(row.volume_share_pct || 0).toFixed(1)}%` }}
                 </td>
                 <td class="py-2 px-3 text-right font-bold text-slate-900">
                   {{ formatRevenueCell(row.val_usd) }}
                 </td>
                 <td class="py-2 px-3 text-right font-black text-emerald-600">
-                  {{ (row.revenue_share_pct || 0).toFixed(1) }}%
+                  {{ (row.revenue_share_pct || 0) > 0 && (row.revenue_share_pct || 0) < 0.05 ? '<0.1%' : `${(row.revenue_share_pct || 0).toFixed(1)}%` }}
                 </td>
               </tr>
             </tbody>
@@ -184,15 +184,59 @@
         <!-- Render EChart -->
         <v-chart v-else class="w-full h-full" :option="chartOption" autoresize />
       </div>
+
+      <!-- Touch-Scrollable Mobile-Responsive Legend for Pie / Donut Charts -->
+      <div 
+        v-if="(chartId === 'chart_commodity_share' || chartType === 'DONUT') && pieLegendItems.length > 0 && filteredData.length > 0"
+        class="mt-2.5 pt-2 border-t border-slate-100"
+      >
+        <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 snap-x scroll-smooth -mx-1 px-1">
+          <button
+            v-for="item in pieLegendItems"
+            :key="item.name"
+            @click="togglePieLegendItem(item.name)"
+            type="button"
+            class="flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-xs font-semibold whitespace-nowrap transition-all flex-shrink-0 cursor-pointer snap-start"
+            :class="item.visible 
+              ? 'bg-slate-50 border-slate-200/90 text-slate-700 shadow-2xs hover:bg-slate-100 hover:border-slate-300' 
+              : 'bg-slate-100/50 border-dashed border-slate-200 text-slate-400 opacity-60 line-through'"
+            :title="`Click to toggle ${item.name} in chart`"
+          >
+            <span 
+              class="w-2.5 h-2.5 rounded-full flex-shrink-0 transition-transform"
+              :style="{ backgroundColor: item.visible ? item.color : '#cbd5e1' }"
+            ></span>
+            <span class="text-[11px] font-medium max-w-[130px] sm:max-w-[160px] truncate">{{ item.name }}</span>
+            <span class="text-[10px] font-bold text-slate-500 font-mono">{{ item.sharePct }}%</span>
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- AI Meaning Container Below -->
     <AiInsightBox :meaning="aiMeaning" />
   </div>
 </template>
-
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
+
+const windowWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1024);
+const updateWidth = () => {
+  if (typeof window !== 'undefined') {
+    windowWidth.value = window.innerWidth;
+  }
+};
+
+onMounted(() => {
+  updateWidth();
+  window.addEventListener('resize', updateWidth);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('resize', updateWidth);
+});
+
+const isMobile = computed(() => windowWidth.value < 640);
 import { Sparkles as SparklesIcon, FilterX as FilterXIcon } from 'lucide-vue-next';
 import { use } from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
@@ -202,6 +246,7 @@ import VChart from 'vue-echarts';
 import AiInsightBox from './AiInsightBox.vue';
 import type { AiMeaning } from '../../types/dataset';
 import { useDatasetStore } from '../../stores/datasetStore';
+import { matchesHsSelection } from '../../utils/analyticsFilters';
 
 use([
   CanvasRenderer,
@@ -235,10 +280,44 @@ export type VolumeUnit = 'AUTO' | 'MT' | 'KT' | 'T' | 'KG';
 const revenueUnit = ref<RevenueUnit>('AUTO');
 const volumeUnit = ref<VolumeUnit>('AUTO');
 
+const pieColors = [
+  '#0284c7', '#10b981', '#6366f1', '#f59e0b', '#ec4899',
+  '#8b5cf6', '#14b8a6', '#f97316', '#3b82f6', '#84cc16'
+];
+
+const hiddenPieItemNames = ref<string[]>([]);
+
+const pieLegendItems = computed(() => {
+  if (props.chartId !== 'chart_commodity_share' && props.chartType !== 'DONUT') return [];
+  const data = filteredData.value;
+  const sliced = (topNLimit.value < 999 && (props.chartId === 'chart_commodity_share' || props.chartId === 'chart_market_share'))
+    ? data.slice(0, topNLimit.value)
+    : data;
+  return sliced.map((d, idx) => ({
+    name: d.name,
+    hs8_code: d.hs8_code,
+    sharePct: d.sharePct,
+    val_usd: d.val_usd,
+    weight_ton: d.weight_ton,
+    color: pieColors[idx % pieColors.length],
+    visible: !hiddenPieItemNames.value.includes(d.name)
+  }));
+});
+
+function togglePieLegendItem(name: string) {
+  if (hiddenPieItemNames.value.includes(name)) {
+    hiddenPieItemNames.value = hiddenPieItemNames.value.filter(n => n !== name);
+  } else {
+    if (hiddenPieItemNames.value.length < pieLegendItems.value.length - 1) {
+      hiddenPieItemNames.value.push(name);
+    }
+  }
+}
+
 // Processed and sliced data based on active filters (clean aggregate without unit dependencies)
 const filteredData = computed(() => {
   const rawList = props.data ? [...props.data] : [];
-  const hsFilter = store.filterHsCode;
+  const hsFilters = store.selectedHsCodes;
   const yrFilter = store.filterYear;
   const ctryFilter = store.filterCountry;
   const isTonnes = store.filterMetric === 'TONNES';
@@ -246,9 +325,7 @@ const filteredData = computed(() => {
   // 1. Commodity Share (Donut Chart of HS8 Commodities)
   if (props.chartId === 'chart_commodity_share') {
     let list = rawList;
-    if (hsFilter !== 'ALL') {
-      list = list.filter(d => (d.hs8_code === hsFilter || d.hs4_code === hsFilter));
-    }
+    list = list.filter(d => matchesHsSelection(d, hsFilters));
     if (yrFilter !== 'ALL') {
       list = list.filter(d => !d.year || d.year.toString() === yrFilter);
     }
@@ -271,7 +348,7 @@ const filteredData = computed(() => {
         weight_ton: 0
       };
       prev.val_usd += (item.val_usd || (item.value ? item.value * 1e6 : 0));
-      prev.weight_ton += (item.weight_ton || 0);
+      prev.weight_ton += (item.weight_ton ?? (item.weight_kg ? item.weight_kg / 1000 : 0));
       commMap.set(code, prev);
     }
 
@@ -295,10 +372,7 @@ const filteredData = computed(() => {
 
   // 2. Destination Countries (Horizontal Bar Chart)
   if (props.chartId === 'chart_market_share') {
-    let list = rawList;
-    if (hsFilter !== 'ALL') {
-      list = list.filter(d => (d.hs8_code === hsFilter || d.hs4_code === hsFilter || d.hs4_code === hsFilter.slice(0, 4)));
-    }
+    let list = rawList.filter(d => matchesHsSelection(d, hsFilters));
     if (yrFilter !== 'ALL') {
       list = list.filter(d => !d.year || d.year.toString() === yrFilter);
     }
@@ -318,7 +392,7 @@ const filteredData = computed(() => {
         weight_ton: 0
       };
       prev.val_usd += (item.val_usd || (item.value ? item.value * 1e6 : 0));
-      prev.weight_ton += (item.weight_ton || 0);
+      prev.weight_ton += (item.weight_ton ?? (item.weight_kg ? item.weight_kg / 1000 : 0));
       countryMap.set(cname, prev);
     }
 
@@ -340,10 +414,7 @@ const filteredData = computed(() => {
 
   // 3. Monthly Seasonality Line Chart
   if (props.chartId === 'chart_seasonality') {
-    let list = rawList;
-    if (hsFilter !== 'ALL') {
-      list = list.filter(d => (d.hs8_code === hsFilter || d.hs4_code === hsFilter || d.hs4_code === hsFilter.slice(0, 4)));
-    }
+    let list = rawList.filter(d => matchesHsSelection(d, hsFilters));
     if (yrFilter !== 'ALL') {
       list = list.filter(d => !d.year || d.year.toString() === yrFilter);
     }
@@ -357,7 +428,7 @@ const filteredData = computed(() => {
       if (!ym || !/^\d{4}-\d{2}$/.test(ym)) continue;
       const prev = monthMap.get(ym) || { yyyy_mm: ym, val_usd: 0, weight_ton: 0 };
       prev.val_usd += (item.val_usd || (item.val_million_usd ? item.val_million_usd * 1e6 : 0));
-      prev.weight_ton += (item.weight_ton || (item.weight_kton ? item.weight_kton * 1000 : 0));
+      prev.weight_ton += (item.weight_ton ?? (item.weight_kton ? item.weight_kton * 1000 : (item.weight_kg ? item.weight_kg / 1000 : 0)));
       monthMap.set(ym, prev);
     }
 
@@ -369,7 +440,7 @@ const filteredData = computed(() => {
 
 // Table rows for Market Share Table widget (dynamically responds to Year and Country slicers with True Ranking)
 const tableRows = computed(() => {
-  const rawList = props.data || store.dashboardData?.market_share_table || [];
+  const rawList = (props.data || store.dashboardData?.market_share_table || []).filter(d => matchesHsSelection(d, store.selectedHsCodes));
   const yrFilter = store.filterYear;
   const ctryFilter = store.filterCountry;
 
@@ -393,7 +464,7 @@ const tableRows = computed(() => {
       weight_ton: 0
     };
     prev.val_usd += (item.val_usd || (item.value ? item.value * 1e6 : 0));
-    prev.weight_ton += (item.weight_ton || 0);
+    prev.weight_ton += (item.weight_ton ?? (item.weight_kg ? item.weight_kg / 1000 : 0));
     countryMap.set(cname, prev);
   }
 
@@ -523,22 +594,25 @@ const formatVolumeCell = (rawTonnes?: number): string => {
   const meta = activeVolumeMeta.value;
   const scaled = rawTonnes / meta.divisor;
   if (meta.divisor === 0.001) {
-    return `${Math.round(scaled).toLocaleString()} kg`;
+    const decimals = (scaled < 10 && scaled % 1 !== 0) ? 2 : (scaled % 1 === 0 ? 0 : 1);
+    return `${scaled.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: 2 })} kg`;
   }
+  const maxDecimals = scaled === 0 ? 0 : (scaled < 0.1 ? 4 : (scaled < 10 && scaled % 1 !== 0 ? 2 : (scaled % 1 === 0 ? 0 : 1)));
+  const minDecimals = scaled % 1 === 0 ? 0 : 1;
   const formatted = scaled.toLocaleString(undefined, {
-    minimumFractionDigits: scaled % 1 === 0 ? 0 : 1,
-    maximumFractionDigits: 2
+    minimumFractionDigits: minDecimals,
+    maximumFractionDigits: maxDecimals
   });
   return `${formatted}${meta.suffix}`;
 };
 
 const dynamicTitle = computed(() => {
-  const selectedComm = store.dashboardData?.hs8_commodities?.find(c => c.hs8_code === store.filterHsCode)
-    || store.dashboardData?.commodity_list?.find(c => c.hs8_code === store.filterHsCode);
+  const code = store.selectedSingleHsCode;
+  const selectedComm = store.dashboardData?.hs8_commodities?.find(c => c.hs8_code === code)
+    || store.dashboardData?.commodity_list?.find(c => c.hs8_code === code);
   const commName = selectedComm ? selectedComm.name_en : '';
-  const activeHsText = store.filterHsCode !== 'ALL' 
-    ? ` (HS ${store.filterHsCode}${commName ? ' · ' + commName : ''})` 
-    : '';
+  const activeHsText = code ? ` (HS ${code}${commName ? ' · ' + commName : ''})`
+    : store.selectedHsCodes.length ? ` (${store.selectedHsCodes.length} commodities)` : '';
   const activeYearText = store.filterYear !== 'ALL' ? ` · ${store.filterYear}` : '';
   const activeCountryText = store.filterCountry !== 'ALL' ? ` · ${store.filterCountry}` : '';
   const filterSuffix = `${activeHsText}${activeYearText}${activeCountryText}`;
@@ -599,8 +673,10 @@ const chartOption = computed(() => {
 
   const toolbox = {
     show: true,
-    right: '2%',
-    top: '2%',
+    right: '1%',
+    top: '0%',
+    itemSize: 12,
+    itemGap: 8,
     feature: {
       saveAsImage: { title: 'Save Image' },
       restore: { title: 'Reset' }
@@ -609,42 +685,51 @@ const chartOption = computed(() => {
 
   // 1. DONUT CHART (for HS8 Commodities)
   if (props.chartId === 'chart_commodity_share' || props.chartType === 'DONUT') {
-    const pieData = slicedData.map(d => ({
-      name: d.name,
-      value: Math.round(((isTonnes ? d.weight_ton : d.val_usd) / unitMeta.value.divisor) * 100) / 100,
-      val_usd: d.val_usd,
-      weight_ton: d.weight_ton,
-      sharePct: d.sharePct
-    }));
+    const pieData = slicedData
+      .filter(d => !hiddenPieItemNames.value.includes(d.name))
+      .map((d) => {
+        const itemIdx = slicedData.findIndex(s => s.name === d.name);
+        const raw = (isTonnes ? d.weight_ton : d.val_usd) / unitMeta.value.divisor;
+        const rounded = raw < 1 ? Math.round(raw * 1000) / 1000 : Math.round(raw * 100) / 100;
+        return {
+          name: d.name,
+          value: rounded,
+          val_usd: d.val_usd,
+          weight_ton: d.weight_ton,
+          sharePct: d.sharePct,
+          itemStyle: {
+            color: pieColors[itemIdx % pieColors.length]
+          }
+        };
+      });
 
     return {
       toolbox,
-      color: ['#0284c7', '#10b981', '#6366f1', '#f59e0b', '#ec4899', '#8b5cf6', '#14b8a6', '#f97316', '#3b82f6', '#84cc16'],
       tooltip: {
         trigger: 'item',
+        confine: true,
+        extraCssText: 'max-width: 240px; white-space: normal; word-break: break-word; border-radius: 10px; padding: 8px 12px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15); z-index: 50;',
         formatter: (params: any) => {
           const item = params.data;
           const valText = isTonnes 
             ? `<strong>${formatVolumeCell(item.weight_ton)}</strong>` 
             : `<strong>${formatRevenueCell(item.val_usd)}</strong>`;
           return `
-            <div style="font-weight:bold;color:#0f172a;margin-bottom:2px;">${params.name}</div>
-            <div style="font-size:12px;color:#334155;">📊 ${valText} (${params.percent}%)</div>
+            <div style="font-weight:bold;color:#0f172a;margin-bottom:2px;line-height:1.3;">${params.name}</div>
+            <div style="font-size:12px;color:#334155;">${valText} <span style="color:#0284c7;font-weight:600;">(${params.percent}%)</span></div>
           `;
         }
       },
+
       legend: {
-        type: 'scroll',
-        orient: 'horizontal',
-        bottom: 0,
-        textStyle: { fontSize: 11, color: '#334155', fontWeight: '500' }
+        show: false
       },
       series: [
         {
           name: 'Commodity Share',
           type: 'pie',
-          radius: ['44%', '68%'],
-          center: ['50%', '46%'],
+          radius: isMobile.value ? ['48%', '76%'] : ['45%', '72%'],
+          center: ['50%', '50%'],
           minAngle: 8,
           avoidLabelOverlap: true,
           itemStyle: {
@@ -653,10 +738,17 @@ const chartOption = computed(() => {
             borderWidth: 2
           },
           label: {
-            show: true,
+            show: !isMobile.value,
             formatter: '{b}: {d}%',
-            fontSize: 10,
-            color: '#334155'
+            fontSize: 9.5,
+            color: '#334155',
+            overflow: 'truncate',
+            width: 80
+          },
+          labelLine: {
+            show: !isMobile.value,
+            length: 8,
+            length2: 8
           },
           data: pieData
         }
@@ -667,15 +759,18 @@ const chartOption = computed(() => {
   // 2. HORIZONTAL BAR CHART (for Destination Countries)
   if (props.chartId === 'chart_market_share' || props.chartType === 'HORIZONTAL_BAR') {
     const categories = slicedData.map(d => d.name).reverse();
-    const values = slicedData.map(d => 
-      Math.round(((isTonnes ? d.weight_ton : d.val_usd) / unitMeta.value.divisor) * 100) / 100
-    ).reverse();
+    const values = slicedData.map(d => {
+      const raw = (isTonnes ? d.weight_ton : d.val_usd) / unitMeta.value.divisor;
+      return raw < 1 ? Math.round(raw * 1000) / 1000 : Math.round(raw * 100) / 100;
+    }).reverse();
 
     return {
       toolbox,
-      grid: { left: '3%', right: '12%', bottom: '8%', top: '6%', containLabel: true },
+      grid: { left: '2%', right: isMobile.value ? '14%' : '18%', bottom: '4%', top: 32, containLabel: true },
       tooltip: {
         trigger: 'axis',
+        confine: true,
+        extraCssText: 'max-width: 260px; white-space: normal; word-break: break-word; border-radius: 10px; padding: 8px 12px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15); z-index: 50;',
         axisPointer: { type: 'shadow' },
         formatter: (params: any[]) => {
           const p = params[0];
@@ -687,18 +782,20 @@ const chartOption = computed(() => {
             : `<strong>${formatRevenueCell(rawValUSD)}</strong>`;
           const shareText = raw?.sharePct ? `<span style="color:#0284c7;font-weight:bold;"> (${raw.sharePct}% share)</span>` : '';
           return `
-            <div style="font-weight:bold;color:#0f172a;">${p.name}</div>
+            <div style="font-weight:bold;color:#0f172a;line-height:1.3;">${p.name}</div>
             <div style="font-size:12px;color:#334155;margin-top:2px;">${valText}${shareText}</div>
           `;
         }
       },
       xAxis: {
         type: 'value',
+        splitNumber: 3,
         splitLine: { lineStyle: { type: 'dashed', color: '#f1f5f9' } },
         axisLabel: {
-          fontSize: 10,
+          fontSize: 9.5,
           color: '#64748b',
-          formatter: (v: number) => `${unitMeta.value.prefix}${v.toLocaleString()}${unitMeta.value.suffix}`
+          hideOverlap: true,
+          formatter: (v: number) => isTonnes ? formatVolumeCell(v * unitMeta.value.divisor) : `${unitMeta.value.prefix}${v.toLocaleString()}${unitMeta.value.suffix}`
         }
       },
       yAxis: {
@@ -706,8 +803,10 @@ const chartOption = computed(() => {
         data: categories,
         axisLabel: {
           fontWeight: 'bold',
-          fontSize: 11,
-          color: '#1e293b'
+          fontSize: 10.5,
+          color: '#1e293b',
+          width: 70,
+          overflow: 'truncate'
         }
       },
       series: [
@@ -715,6 +814,7 @@ const chartOption = computed(() => {
           name: 'Export Metric',
           type: 'bar',
           data: values,
+          barMaxWidth: 22,
           itemStyle: {
             color: '#0284c7',
             borderRadius: [0, 6, 6, 0]
@@ -722,8 +822,9 @@ const chartOption = computed(() => {
           label: {
             show: true,
             position: 'right',
-            formatter: (p: any) => `${unitMeta.value.prefix}${p.value.toLocaleString()}${unitMeta.value.suffix}`,
-            fontSize: 10,
+            offset: [4, 0],
+            formatter: (p: any) => isTonnes ? formatVolumeCell(p.value * unitMeta.value.divisor) : `${unitMeta.value.prefix}${p.value.toLocaleString()}${unitMeta.value.suffix}`,
+            fontSize: 9.5,
             fontWeight: 'bold',
             color: '#0369a1'
           }
@@ -737,17 +838,66 @@ const chartOption = computed(() => {
     const xDates = data.map(d => d.yyyy_mm);
     const values = data.map(d => {
       const rawVal = isTonnes ? (d.weight_ton || 0) : (d.val_usd || 0);
-      return Math.round((rawVal / unitMeta.value.divisor) * 100) / 100;
+      const raw = rawVal / unitMeta.value.divisor;
+      return raw < 1 ? Math.round(raw * 1000) / 1000 : Math.round(raw * 100) / 100;
     });
     const metricName = isTonnes ? 'Export Volume' : 'Export Revenue';
     const yAxisLabel = (v: number) => `${unitMeta.value.prefix}${v.toLocaleString()}${unitMeta.value.suffix}`;
     const yAxisName = isTonnes ? `Volume (${unitMeta.value.suffix.trim()})` : `Revenue (${unitMeta.value.label})`;
 
     return {
-      toolbox,
-      grid: { left: '3%', right: '4%', bottom: '8%', top: '12%', containLabel: true },
+      toolbox: {
+        show: true,
+        right: '1%',
+        top: '0%',
+        itemSize: 12,
+        itemGap: 8,
+        feature: {
+          dataZoom: {
+            yAxisIndex: 'none',
+            title: {
+              zoom: 'Zoom Area',
+              back: 'Reset'
+            }
+          },
+          saveAsImage: { title: 'Save Image' },
+          restore: { title: 'Reset' }
+        }
+      },
+      dataZoom: [
+        {
+          type: 'inside',
+          xAxisIndex: 0,
+          zoomOnMouseWheel: true,
+          moveOnMouseMove: true,
+          moveOnMouseWheel: true
+        },
+        {
+          type: 'slider',
+          xAxisIndex: 0,
+          height: 16,
+          bottom: 2,
+          borderColor: 'transparent',
+          backgroundColor: '#f8fafc',
+          fillerColor: 'rgba(2, 132, 199, 0.15)',
+          handleStyle: {
+            color: '#0284c7',
+            borderColor: '#0284c7',
+            shadowBlur: 2,
+            shadowColor: 'rgba(0, 0, 0, 0.15)'
+          },
+          textStyle: {
+            color: '#64748b',
+            fontSize: 9
+          },
+          brushSelect: false
+        }
+      ],
+      grid: { left: '2%', right: '4%', bottom: 28, top: 32, containLabel: true },
       tooltip: {
         trigger: 'axis',
+        confine: true,
+        extraCssText: 'max-width: 240px; white-space: normal; word-break: break-word; border-radius: 10px; padding: 8px 12px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15); z-index: 50;',
         axisPointer: { type: 'line', lineStyle: { color: '#0284c7', type: 'dashed' } },
         formatter: (params: any[]) => {
           const p = params[0];
@@ -757,24 +907,25 @@ const chartOption = computed(() => {
           const rawWeightTon = raw?.weight_ton ?? (isTonnes ? p.value * unitMeta.value.divisor : 0);
           const valDisplay = isTonnes ? formatVolumeCell(rawWeightTon) : formatRevenueCell(rawValUSD);
           return `
-            <div style="font-weight:bold;color:#0f172a;margin-bottom:3px;">${date}</div>
-            <div style="font-size:12px;color:#334155;">📈 ${metricName}: <strong>${valDisplay}</strong></div>
+            <div style="font-weight:bold;color:#0f172a;margin-bottom:3px;line-height:1.3;">${date}</div>
+            <div style="font-size:12px;color:#334155;">${metricName}: <strong>${valDisplay}</strong></div>
           `;
         }
       },
+
       xAxis: {
         type: 'category',
         data: xDates,
         boundaryGap: false,
         axisLine: { lineStyle: { color: '#cbd5e1' } },
-        axisLabel: { fontSize: 10, color: '#64748b' }
+        axisLabel: { fontSize: 9.5, color: '#64748b', hideOverlap: true }
       },
       yAxis: {
         type: 'value',
         name: yAxisName,
         nameTextStyle: { fontSize: 10, color: '#64748b', fontWeight: 'bold' },
         splitLine: { lineStyle: { type: 'dashed', color: '#f1f5f9' } },
-        axisLabel: { fontSize: 10, color: '#64748b', formatter: yAxisLabel }
+        axisLabel: { fontSize: 9.5, color: '#64748b', formatter: yAxisLabel }
       },
       series: [
         {

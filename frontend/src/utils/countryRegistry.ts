@@ -1,5 +1,3 @@
-import worldGeoJson from '../assets/world.json';
-
 export interface CountryMeta {
   en: string;
   km: string;
@@ -178,30 +176,6 @@ function registerAliases(entry: CountryMeta) {
 
 RAW_COUNTRY_REGISTRY.forEach(registerAliases);
 
-// Calculate Centroid fallback from GeoJSON features if unknown
-function getFeatureCentroid(feature: any): [number, number] {
-  const geom = feature.geometry;
-  if (!geom || !geom.coordinates) return [100.0, 20.0];
-  let totalLng = 0, totalLat = 0, count = 0;
-  
-  function processCoords(coords: any) {
-    if (typeof coords[0] === 'number' && typeof coords[1] === 'number') {
-      totalLng += coords[0];
-      totalLat += coords[1];
-      count++;
-    } else if (Array.isArray(coords)) {
-      for (const c of coords) {
-        processCoords(c);
-      }
-    }
-  }
-  
-  processCoords(geom.coordinates);
-  return count > 0 
-    ? [Math.round((totalLng / count) * 10000) / 10000, Math.round((totalLat / count) * 10000) / 10000]
-    : [100.0, 20.0];
-}
-
 /**
  * Resolves any raw country string (Khmer or English or abbreviation) to standardized CountryMeta
  */
@@ -230,26 +204,7 @@ export function getCountryMeta(rawName: string): CountryMeta {
     }
   }
 
-  // 3. Fallback: Search in worldGeoJson features directly
-  const worldFeatures = (worldGeoJson as any).features || [];
-  const matchedFeature = worldFeatures.find((f: any) => {
-    const fname = f.properties?.name || '';
-    return fname && (fname.toLowerCase() === lower || lower.includes(fname.toLowerCase()) || fname.toLowerCase().includes(lower));
-  });
-
-  if (matchedFeature) {
-    const calculatedCoords = getFeatureCentroid(matchedFeature);
-    const fname = matchedFeature.properties?.name || clean;
-    return {
-      en: fname,
-      km: clean,
-      iso: 'OTH',
-      coords: calculatedCoords,
-      flag: '🌐',
-    };
-  }
-
-  // Default fallback
+  // 3. Default fallback
   return { en: clean, km: clean, iso: 'OTH', coords: [100.0, 20.0], flag: '🌐' };
 }
 

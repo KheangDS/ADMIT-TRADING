@@ -12,11 +12,16 @@ class RedisCacheService:
 
     def _init_redis(self):
         """Initializes connection to Redis server if available."""
+        if settings.ENVIRONMENT == "test":
+            self._redis_client = None
+            self.is_redis_available = False
+            return
         try:
             import redis
             if settings.REDIS_URL:
                 self._redis_client = redis.from_url(
                     settings.REDIS_URL,
+                    password=settings.REDIS_PASSWORD or None,
                     decode_responses=True,
                     socket_connect_timeout=1.5
                 )
@@ -127,8 +132,9 @@ class RedisCacheService:
         when a new dataset is uploaded or merged.
         """
         self.delete_by_pattern("agritrade:dashboard:*")
+        self.delete_by_pattern("agritrade:trade:*")
         self.delete_by_pattern("agritrade:admin:*")
-        print("[Redis Service] 🧹 Invalidated all trade dashboard & admin caches due to new data ingestion.")
+        print("[Redis Service]  Invalidated all trade dashboard, public status & admin caches due to new data ingestion.")
 
     def get_status(self) -> Dict[str, Any]:
         """Returns current Redis caching health status."""

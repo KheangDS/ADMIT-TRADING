@@ -1,0 +1,15 @@
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+tests/
+storage/
+.env
+.env.*
+*.duckdb*
+*.sqlite*
+*.log
+

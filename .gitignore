@@ -29,14 +29,27 @@ env/
 .pytest_cache/
 .coverage
 
-# DuckDB Persistent Storage & Temporary files
+# Dynamic Runtime Storage & Databases (Auto-created on initialization; never committed)
+storage/
+*/storage/
+backend/storage/
 *.duckdb
 *.duckdb.wal
 *.tmp
-backend/storage/*.duckdb
-backend/storage/*.duckdb.wal
-storage/*.duckdb
-storage/*.duckdb.wal
+*.session
+*.session-journal
+*.sqlite
+*.sqlite3
+khqr-learn.zip
+# Local prototype notes can contain private merchant/provider details.
+/KHQR_INTEGRATION_GUIDE.md
+
+# Test folders (keep local, exclude from Git)
+test/
+tests/
+
+# Generated frontend type/build state
+*.tsbuildinfo
 
 # IDE & OS files
 .DS_Store
@@ -48,5 +61,9 @@ Thumbs.db
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
+.pi-subagents
+Dataset.xlsx
+docs/
 
-
+/CAMFEIA_WIDGET_INTEGRATION_GUIDE.md
+/CamFeia 2024-2026(JUN).xlsx

@@ -147,6 +147,7 @@ export interface ExchangeRateInfo {
 }
 
 export interface DashboardPayload {
+  publication?: { id: string; revision_id: string; start_month: string; end_month: string } | null;
   session_id: string;
   is_valid_trade_data: boolean;
   validation_message?: string;

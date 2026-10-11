@@ -1,33 +1,47 @@
 <template>
-  <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-100 shadow-xs hover:shadow-md hover:border-slate-200/80 transition-all duration-200 flex flex-col justify-between min-h-[116px]">
-    <!-- Card Header: Title & Icon Badge -->
-    <div class="flex items-center justify-between gap-2 w-full">
-      <div class="min-w-0 flex-1">
-        <span class="text-[11px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider block truncate" :title="description || label">
-          {{ displayTitle }}
-        </span>
-      </div>
+  <div 
+    class="bg-white p-3.5 sm:p-4 lg:p-5 rounded-2xl border border-slate-100 shadow-xs hover:shadow-md hover:border-slate-200/80 transition-all duration-200 flex flex-col justify-between items-center text-center"
+    :class="[
+      isHero ? 'min-h-[96px] sm:min-h-[116px] bg-gradient-to-br from-white via-white to-emerald-50/30 border-emerald-100/80' : 'min-h-[90px] sm:min-h-[116px]'
+    ]"
+  >
+    <!-- Card Header: Title & Icon Badge (Centered) -->
+    <div class="flex items-center justify-center gap-1.5 w-full text-center">
       <div 
-        class="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 shadow-2xs"
-        :class="badgeColorClass"
+        class="rounded-lg flex items-center justify-center flex-shrink-0"
+        :class="[
+          badgeColorClass,
+          isHero ? 'w-5 h-5 sm:w-6 sm:h-6' : 'w-4 h-4 sm:w-5 sm:h-5'
+        ]"
       >
-        <DollarSignIcon v-if="isUsd" class="w-4 h-4 text-emerald-600" />
-        <CoinsIcon v-else-if="isKhr" class="w-4 h-4 text-amber-600" />
-        <ScaleIcon v-else-if="isVolume" class="w-4 h-4 text-sky-600" />
-        <GlobeIcon v-else-if="isMarkets" class="w-4 h-4 text-indigo-600" />
-        <BoxesIcon v-else-if="isCommodities" class="w-4 h-4 text-purple-600" />
-        <TrendingUpIcon v-else class="w-4 h-4 text-sky-600" />
+        <DollarSignIcon v-if="isUsd" class="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-600" />
+        <ArrowLeftRightIcon v-else-if="isTransactions" class="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-600" />
+        <ScaleIcon v-else-if="isVolume" class="w-3 h-3 sm:w-3.5 sm:h-3.5 text-sky-600" />
+        <GlobeIcon v-else-if="isMarkets" class="w-3 h-3 sm:w-3.5 sm:h-3.5 text-indigo-600" />
+        <BoxesIcon v-else-if="isCommodities" class="w-3 h-3 sm:w-3.5 sm:h-3.5 text-purple-600" />
+        <TrendingUpIcon v-else class="w-3 h-3 sm:w-3.5 sm:h-3.5 text-sky-600" />
       </div>
+      <span 
+        class="font-bold text-slate-500 uppercase tracking-tight leading-tight truncate" 
+        :class="isHero ? 'text-[11px] sm:text-xs text-slate-600' : 'text-[9px] sm:text-[11px]'"
+        :title="description || label"
+      >
+        {{ displayTitle }}
+      </span>
     </div>
     
-    <!-- Card Body: Value & Unit Centered -->
-    <div class="my-auto pt-3 pb-1 flex items-baseline justify-center gap-1.5 flex-wrap text-center">
-      <span class="text-2xl sm:text-[26px] font-black text-slate-900 tracking-tight leading-none">
+    <!-- Card Body: Value & Unit (Centered) -->
+    <div class="my-auto pt-2 sm:pt-2.5 pb-0.5 sm:pb-1 flex items-baseline justify-center gap-1.5 flex-wrap text-center w-full">
+      <span 
+        class="font-black text-slate-900 tracking-tight leading-none"
+        :class="isHero ? 'text-2xl sm:text-[28px]' : 'text-xl sm:text-[24px] lg:text-[26px]'"
+      >
         {{ formattedNumber }}
       </span>
       <span 
         v-if="unitSuffix" 
-        class="text-[11px] font-bold px-1.5 py-0.5 rounded-md text-slate-600 bg-slate-100/90 border border-slate-200/60 leading-none"
+        class="font-bold px-1.5 py-0.5 rounded-md text-slate-600 bg-slate-100/90 border border-slate-200/60 leading-none"
+        :class="isHero ? 'text-[10px] sm:text-[11px]' : 'text-[9px] sm:text-[11px]'"
       >
         {{ unitSuffix }}
       </span>
@@ -40,20 +54,26 @@ import { computed } from 'vue';
 import { 
   Globe as GlobeIcon, 
   DollarSign as DollarSignIcon, 
-  Coins as CoinsIcon, 
+  ArrowLeftRight as ArrowLeftRightIcon, 
   Scale as ScaleIcon, 
-  Boxes as BoxesIcon,
+  Boxes as BoxesIcon, 
   TrendingUp as TrendingUpIcon 
 } from 'lucide-vue-next';
 
-const props = defineProps<{
-  label: string;
-  value: string;
-  description?: string;
-}>();
+const props = withDefaults(
+  defineProps<{
+    label: string;
+    value: string;
+    description?: string;
+    isHero?: boolean;
+  }>(),
+  {
+    isHero: false,
+  }
+);
 
-const isUsd = computed(() => props.label.includes('($)') || props.label.toLowerCase().includes('usd'));
-const isKhr = computed(() => props.label.includes('(KHR)') || props.label.includes('(៛)') || props.label.toLowerCase().includes('khr'));
+const isUsd = computed(() => props.label.includes('($)') || props.label.toLowerCase().includes('usd') || props.label.toLowerCase().includes('revenue (usd)'));
+const isTransactions = computed(() => props.label.toLowerCase().includes('transaction') || props.label.toLowerCase().includes('record') || props.label.toLowerCase().includes('declaration'));
 const isVolume = computed(() => props.label.toLowerCase().includes('volume') || props.label.toLowerCase().includes('weight'));
 const isMarkets = computed(() => props.label.toLowerCase().includes('market') || props.label.toLowerCase().includes('countr') || props.label.toLowerCase().includes('destination'));
 const isCommodities = computed(() => props.label.toLowerCase().includes('commodit') || props.label.toLowerCase().includes('hs8') || props.label.toLowerCase().includes('product'));
@@ -62,7 +82,7 @@ const isCommodities = computed(() => props.label.toLowerCase().includes('commodi
 const displayTitle = computed(() => {
   const lbl = props.label.trim();
   if (isUsd.value) return 'Revenue (USD)';
-  if (isKhr.value) return 'Revenue (KHR)';
+  if (isTransactions.value) return 'Total Transactions';
   if (isVolume.value) return 'Export Volume';
   if (isMarkets.value) return 'Destination Markets';
   if (isCommodities.value) return 'Total Commodities';
@@ -72,7 +92,7 @@ const displayTitle = computed(() => {
 // Dynamic icon background classes
 const badgeColorClass = computed(() => {
   if (isUsd.value) return 'bg-emerald-50 border border-emerald-100/80';
-  if (isKhr.value) return 'bg-amber-50 border border-amber-100/80';
+  if (isTransactions.value) return 'bg-amber-50 border border-amber-100/80';
   if (isVolume.value) return 'bg-sky-50 border border-sky-100/80';
   if (isMarkets.value) return 'bg-indigo-50 border border-indigo-100/80';
   if (isCommodities.value) return 'bg-purple-50 border border-purple-100/80';
@@ -84,24 +104,14 @@ const parsedValue = computed(() => {
   const val = props.value.trim();
   
   // Format: "$840.42 Million USD" -> "$840.42M", unit: "USD"
-  if (val.includes('Million USD')) {
-    const num = val.replace('Million USD', '').trim();
+  if (val.includes('Million USD') || val.includes('M USD')) {
+    const num = val.replace(/Million USD|M USD/g, '').trim();
     return { number: `${num}M`, unit: 'USD' };
   }
-  // Format: "3,406.24 Billion KHR" or "៛3,406.24 Billion KHR" -> "៛3,406.24B", unit: "KHR"
-  if (val.includes('Billion KHR') || val.includes('B KHR')) {
-    const num = val.replace(/Billion KHR|B KHR/g, '').replace('៛', '').trim();
-    return { number: `៛${num}B`, unit: 'KHR' };
-  }
-  // Format: "3,406.24 Million KHR" or "៛3,406.24 Million KHR" -> "៛3,406.24M", unit: "KHR"
-  if (val.includes('Million KHR') || val.includes('M KHR')) {
-    const num = val.replace(/Million KHR|M KHR/g, '').replace('៛', '').trim();
-    return { number: `៛${num}M`, unit: 'KHR' };
-  }
-  // Format: "0.00 KHR" or "៛0.00 KHR" -> "៛0.00", unit: "KHR"
-  if (val.includes('KHR')) {
-    const num = val.replace('KHR', '').replace('៛', '').trim();
-    return { number: `៛${num}`, unit: 'KHR' };
+  // Format: "625 Records" or "625 Transactions" -> "625", unit: "Records"
+  if (val.includes('Records') || val.includes('Transactions') || val.includes('Declarations')) {
+    const num = val.replace(/Records|Transactions|Declarations/g, '').trim();
+    return { number: num, unit: 'Records' };
   }
   // Format: "1,137,019.05 Tonnes" -> "1.14M Tonnes" or cleanly formatted
   if (val.includes('Tonnes')) {
@@ -116,8 +126,8 @@ const parsedValue = computed(() => {
     return { number: num, unit: 'Tonnes' };
   }
   // Format: "41 Countries" -> "41", unit: "Markets"
-  if (val.includes('Countries')) {
-    const num = val.replace('Countries', '').trim();
+  if (val.includes('Countries') || val.includes('Markets')) {
+    const num = val.replace(/Countries|Markets/g, '').trim();
     return { number: num, unit: 'Markets' };
   }
   // Format: "20 Commodities" -> "20", unit: "Commodities"

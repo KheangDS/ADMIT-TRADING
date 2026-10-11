@@ -1,4 +1,9 @@
 import io
+import csv
+import re
+import zipfile
+from numbers import Number
+from decimal import Decimal, InvalidOperation
 import datetime
 from typing import Tuple, Dict, Any, List, Optional
 import numpy as np
@@ -15,119 +20,267 @@ from app.services.hs_product_service import (
     RAW_VS_PROCESSED_PAIRS
 )
 
+MAX_IMPORT_ROWS = 200_000
+MAX_EXPANDED_BYTES = 150 * 1024 * 1024
+COLUMNS = [
+    {'key': 'year', 'english': 'Year', 'khmer': 'ឆ្នាំ', 'required': True},
+    {'key': 'month', 'english': 'Month', 'khmer': 'ខែ', 'required': True},
+    {'key': 'hs8', 'english': 'HS8', 'khmer': 'កូដទំនិញ ៨ខ្ទង់', 'required': True},
+    {'key': 'hs4', 'english': 'HS4', 'khmer': 'កូដទំនិញ ៤ខ្ទង់', 'required': True},
+    {'key': 'desc', 'english': 'Description', 'khmer': 'បរិយាយកូដ ៤ខ្ទង់', 'required': False},
+    {'key': 'country', 'english': 'Country', 'khmer': 'ប្រទេសគម្យដ្ឋាន', 'required': True},
+    {'key': 'weight', 'english': 'Weight (kg)', 'khmer': 'ទម្ងន់ (គក្រ)', 'required': True},
+    {'key': 'value', 'english': 'Value (KHR)', 'khmer': 'តម្លៃ (រៀល)', 'required': True},
+]
+
+
+def unit_price(value, weight):
+    """Zero weight has no unit price; expose 0 consistently, never NaN/inf."""
+    return value / weight if weight > 0 else 0.0
+
+
+def label(value):
+    return ' '.join(clean_text(value).casefold().split())
+
+
+ALIASES = {label(c[n]): c['key'] for c in COLUMNS for n in ('english', 'khmer')}
+ALIASES.update({label(k): v for k, v in {
+    'year': 'year', 'month': 'month', 'hs8_code': 'hs8', 'hs4_code': 'hs4',
+    'hs_8': 'hs8', 'hs_4': 'hs4', 'hs 8': 'hs8', 'hs 4': 'hs4',
+    'hs8 code': 'hs8', 'hs4 code': 'hs4', 'hs_code': 'hs8', 'hs code': 'hs8',
+    'country_code': 'country', 'country': 'country', 'destination': 'country',
+    'weight_kg': 'weight', 'val_khr': 'value', 'value_khr': 'value',
+    'weight kg': 'weight', 'value khr': 'value', 'weight': 'weight', 'value': 'value',
+    'ប្រទេស': 'country', 'បរិយាយ': 'desc', 'បរិយាយកូដ': 'desc',
+    'កូដ ៨ខ្ទង់': 'hs8', 'កូដ ៤ខ្ទង់': 'hs4', 'កូដ៨ខ្ទង់': 'hs8', 'កូដ៤ខ្ទង់': 'hs4',
+    'ទម្ងន់': 'weight', 'តម្លៃ': 'value',
+}.items()})
+
+
+def month_bound(value):
+    if not isinstance(value, str) or not re.fullmatch(r'(19\d{2}|20\d{2}|21\d{2}|2200)-(0[1-9]|1[0-2])', value):
+        raise ValueError('Month bounds must be YYYY-MM (1900–2200)')
+    return value
+
+
+def decimal_number(value):
+    if isinstance(value, bool):
+        raise ValueError('Boolean values are not numbers')
+    if isinstance(value, (Number, Decimal)):
+        # XLSX stores IEEE-754 numbers with Excel's 15 significant digits.
+        # Remove binary representation noise, not signs/currencies or real text precision.
+        number = Decimal(format(value, '.15g') if isinstance(value, (float, np.floating)) else str(value))
+        if not number.is_finite():
+            raise ValueError('Nonfinite numbers are not permitted')
+        text = format(number, 'f')
+    else:
+        text = clean_text(value)
+    # Only conventional thousands separators; do not strip signs/currency/units.
+    if ',' in text:
+        if not re.fullmatch(r'\+?\d{1,3}(,\d{3})+(\.\d{1,6})?', text):
+            raise ValueError('Malformed thousands separators')
+        text = text.replace(',', '')
+    if not re.fullmatch(r'\+?\d+(\.\d{1,6})?', text):
+        raise ValueError('Expected a nonnegative number, at most 6 decimals, no currency/units')
+    try:
+        result = Decimal(text)
+    except InvalidOperation:
+        raise ValueError('Invalid number')
+    if not result.is_finite() or result < 0 or result >= Decimal('1e18'):
+        raise ValueError('Number outside permitted range')
+    return format(result.normalize(), 'f')
+
+
+def integer_number(value, low, high):
+    result = Decimal(decimal_number(value))
+    if result != result.to_integral_value() or not low <= result <= high:
+        raise ValueError(f'Expected integer {low}–{high}')
+    return int(result)
+
+
+def hs_code(value, digits):
+    text = clean_text(value)
+    if re.fullmatch(r'\d+\.0+', text):
+        text = text.split('.')[0]
+    text = re.sub(r'[\s.\-_]', '', text)
+    if not re.fullmatch(r'\d{1,' + str(digits) + r'}', text):
+        raise ValueError(f'HS code must contain at most {digits} digits')
+    result = text.zfill(digits)
+    if int(result) == 0:
+        raise ValueError('Zero HS code is not valid')
+    return result
+
+
+def parse_import(contents, filename, mode, start_month=None, end_month=None):
+    """Bounded source parser with source-row diagnostics, never a totals merge."""
+    result = {'rows': [], 'errors': [], 'duplicate_count': 0, 'column_mapping': {},
+              'start_month': start_month, 'end_month': end_month}
+    workbook = None
+    try:
+        if mode not in ('complete', 'partial'):
+            raise ValueError('Mode must be complete or partial')
+        if mode == 'complete' and not (start_month and end_month):
+            raise ValueError('Complete imports require explicit start_month and end_month')
+        if bool(start_month) != bool(end_month):
+            raise ValueError('Supply both month bounds or neither')
+        if start_month:
+            month_bound(start_month)
+            month_bound(end_month)
+            if start_month > end_month:
+                raise ValueError('start_month exceeds end_month')
+        extension = filename.rsplit('.', 1)[-1].lower()
+        if extension == 'csv':
+            if b'\x00' in contents:
+                raise ValueError('CSV must be UTF-8 text')
+            iterator = csv.reader(io.StringIO(contents.decode('utf-8-sig')), strict=True)
+        elif extension == 'xlsx':
+            with zipfile.ZipFile(io.BytesIO(contents)) as archive:
+                if len(archive.infolist()) > 1000 or sum(f.file_size for f in archive.infolist()) > MAX_EXPANDED_BYTES:
+                    raise ValueError('Expanded workbook exceeds safe limits')
+            from openpyxl import load_workbook
+            workbook = load_workbook(io.BytesIO(contents), read_only=True, data_only=False, keep_links=False)
+            if len(workbook.worksheets) != 1:
+                raise ValueError('Import workbook must have exactly one worksheet')
+            sheet = workbook.worksheets[0]
+            if (sheet.max_column or 0) > 32 or (sheet.max_row or 0) > MAX_IMPORT_ROWS + 15:
+                raise ValueError('Workbook dimensions exceed safe limits')
+            iterator = sheet.iter_rows(values_only=True, max_col=32)
+        else:
+            raise ValueError('Only .csv and .xlsx are supported')
+        header = None
+        for row_num, cells in enumerate(iterator, 1):
+            if row_num > MAX_IMPORT_ROWS + 15:
+                raise ValueError('Import exceeds 200,000 rows')
+            if len(cells) > 32 or any(len(str(v)) > 4096 for v in cells if v is not None):
+                raise ValueError(f'Row {row_num}: too many columns or oversized cell')
+            if not any(v is not None and clean_text(v) for v in cells):
+                continue
+            if header is None:
+                recognized = {ALIASES[label(v)] for v in cells if label(v) in ALIASES}
+                if not {'year', 'month', 'hs8', 'country'}.issubset(recognized):
+                    if row_num < 15:
+                        continue
+                    raise ValueError('Required header not found in first 15 rows')
+                mapping = {}
+                for i, v in enumerate(cells):
+                    key = ALIASES.get(label(v))
+                    if key:
+                        if key in mapping:
+                            raise ValueError(f'Ambiguous duplicate column for {key}')
+                        mapping[key] = i
+                missing = [c['english'] for c in COLUMNS if c['required'] and c['key'] not in mapping]
+                if missing:
+                    raise ValueError('Missing required columns: ' + ', '.join(missing) + '. Weight must explicitly be kg and value KHR.')
+                header = mapping
+                result['column_mapping'] = {key: clean_text(cells[i]) for key, i in mapping.items()}
+                continue
+            try:
+                values = {key: cells[i] if i < len(cells) else None for key, i in header.items()}
+                if any(isinstance(v, str) and v.startswith('=') for v in values.values()):
+                    raise ValueError('Formula cells are not permitted')
+                year = integer_number(values['year'], 1900, 2200)
+                month = integer_number(values['month'], 1, 12)
+                period = f'{year:04d}-{month:02d}'
+                if start_month and not start_month <= period <= end_month:
+                    raise ValueError('Row is outside declared month coverage')
+                code8, code4 = hs_code(values['hs8'], 8), hs_code(values['hs4'], 4)
+                if code8[:4] != code4:
+                    raise ValueError('HS8 does not belong to supplied HS4 parent')
+                country = clean_text(values['country']) if values['country'] is not None else ''
+                if not country or len(country) > 160:
+                    raise ValueError('Country is required, at most 160 characters')
+                result['rows'].append({'year': year, 'month': month, 'hs8_code': code8, 'hs4_code': code4,
+                    'country_label': country, 'weight_kg': decimal_number(values['weight']),
+                    'val_khr': decimal_number(values['value']), 'source_row': row_num})
+            except (ValueError, TypeError) as exc:
+                result['errors'].append({'row': row_num, 'message': str(exc)})
+                if len(result['errors']) >= 500:
+                    raise ValueError('Stopped after 500 source-row errors')
+        if header is None:
+            raise ValueError('Required trade schema header not found')
+        if not result['rows']:
+            raise ValueError('Empty imports cannot replace trade data; use a separate reviewed delete workflow')
+        if not start_month:
+            periods = [f"{r['year']:04d}-{r['month']:02d}" for r in result['rows']]
+            result['start_month'], result['end_month'] = min(periods), max(periods)
+    except Exception as exc:
+        result['errors'].append({'row': 0, 'message': str(exc) if isinstance(exc, ValueError) else 'Could not parse UTF-8 CSV or XLSX file'})
+    finally:
+        if workbook:
+            workbook.close()
+    return result
+
+
 class ETLService:
     @staticmethod
     def inspect_and_load_file(file_contents: bytes, filename: str) -> pd.DataFrame:
-        """Parses Excel or CSV files, dynamically detecting the true header row."""
-        if filename.endswith('.csv'):
-            df_raw = pd.read_csv(io.BytesIO(file_contents), encoding="utf-8-sig")
-            return df_raw
-            
-        # For Excel (.xlsx, .xls) scan first 15 rows for header density
-        df_scan = pd.read_excel(io.BytesIO(file_contents), nrows=15, header=None)
-        best_header_idx = 0
-        max_score = -1
-        
-        for idx, row in df_scan.iterrows():
-            str_vals = [clean_text(v) for v in row.dropna() if clean_text(v) != '']
-            score = len(str_vals) * (len(set(str_vals)) / max(1, len(str_vals)))
-            if score > max_score:
-                max_score = score
-                best_header_idx = idx
-                
-        df = pd.read_excel(io.BytesIO(file_contents), header=best_header_idx)
-        return df
+        """Compatibility parser; strict units/schema, never infer missing metrics."""
+        if len(file_contents) > 26214400:
+            raise ValueError('Import exceeds upload limit')
+        parsed = parse_import(file_contents, filename, 'partial')
+        if parsed['errors']:
+            raise ValueError(str(parsed['errors']))
+        return pd.DataFrame(parsed['rows']).rename(columns={'hs8_code': 'HS8', 'hs4_code': 'HS4',
+               'country_label': 'Country', 'weight_kg': 'Weight (kg)', 'val_khr': 'Value (KHR)'})
 
     @staticmethod
     def resolve_period_overlaps(frames: List[pd.DataFrame]) -> pd.DataFrame:
-        """
-        Intelligently combines multiple DataFrames across periodic file drops.
-        If multiple files report data for the same (Year, Month), selects the most
-        complete batch (maximum row count), preventing duplicate batch stacking.
-        """
+        """Legacy implicit replacement is forbidden; use declared staged coverage."""
         if not frames:
             return pd.DataFrame()
         if len(frames) == 1:
             return frames[0]
-
-        all_periods = set()
-        for frame in frames:
-            if 'year' in frame.columns and 'month' in frame.columns:
-                valid_rows = frame.dropna(subset=['year', 'month'])
-                for _, r in valid_rows[['year', 'month']].drop_duplicates().iterrows():
-                    try:
-                        y = int(float(r['year']))
-                        m = int(float(r['month']))
-                        all_periods.add((y, m))
-                    except (ValueError, TypeError):
-                        continue
-
-        if not all_periods:
-            return pd.concat(frames, ignore_index=True)
-
-        resolved_batches = []
-        for y, m in sorted(all_periods):
-            candidates = []
-            for frame in frames:
-                try:
-                    subset = frame[
-                        (pd.to_numeric(frame['year'], errors='coerce') == y) &
-                        (pd.to_numeric(frame['month'], errors='coerce') == m)
-                    ]
-                    if not subset.empty:
-                        candidates.append((len(subset), subset))
-                except Exception:
-                    continue
-
-            if not candidates:
-                continue
-
-            candidates.sort(key=lambda x: x[0], reverse=True)
-            resolved_batches.append(candidates[0][1])
-
-        return pd.concat(resolved_batches, ignore_index=True)
+        raise ValueError('Multiple files require explicit complete/partial coverage; row counts never imply completeness')
 
     @staticmethod
     def validate_trade_schema(df: pd.DataFrame) -> Tuple[bool, str, Dict[str, str]]:
-        """
-        Validates whether the dataframe contains the required trade data columns:
-        Year, Month, HS8, HS4, Description, Country, Weight, Value.
-        """
-        cols_lower = {clean_text(str(c)).lower(): c for c in df.columns}
-        
-        # Keyword mappings
-        year_col = next((cols_lower[k] for k in cols_lower if any(y in k for y in ['ឆ្នាំ', 'year', 'yyyy'])), None)
-        month_col = next((cols_lower[k] for k in cols_lower if any(m in k for m in ['ខែ', 'month', 'mm'])), None)
-        hs8_col = next((cols_lower[k] for k in cols_lower if any(h in k for h in ['៨ខ្ទង់', 'hs8', '8-digit'])), None)
-        hs4_col = next((cols_lower[k] for k in cols_lower if any(h in k for h in ['៤ខ្ទង់', 'hs4', '4-digit'])), None)
-        desc_col = next((cols_lower[k] for k in cols_lower if any(d in k for d in ['បរិយាយ', 'description', 'desc'])), None)
-        country_col = next((cols_lower[k] for k in cols_lower if any(c in k for c in ['ប្រទេស', 'country', 'destination', 'partner'])), None)
-        weight_col = next((cols_lower[k] for k in cols_lower if any(w in k for w in ['ទម្ងន់', 'weight', 'kg', 'volume', 'tons'])), None)
-        value_col = next((cols_lower[k] for k in cols_lower if any(v in k for v in ['តម្លៃ', 'value', 'riel', 'khr', 'usd'])), None)
-        
-        col_map = {
-            'year': year_col,
-            'month': month_col,
-            'hs8': hs8_col,
-            'hs4': hs4_col,
-            'desc': desc_col,
-            'country': country_col,
-            'weight': weight_col,
-            'value': value_col
-        }
-        
-        missing = [k for k, v in col_map.items() if v is None]
-        
-        if len(missing) > 3:
-            msg = f"This dataset is missing standard trade columns ({', '.join(missing)}). Please upload a valid Agricultural Trade dataset."
-            return False, msg, col_map
-            
-        return True, "Dataset validated successfully.", col_map
+        """Exact bilingual headers. kg/KHR are explicit, not guessed or converted."""
+        col_map = {}
+        for column in df.columns:
+            key = ALIASES.get(label(column))
+            if key:
+                if key in col_map:
+                    return False, f'Ambiguous duplicate column for {key}', col_map
+                col_map[key] = column
+        missing = [c['key'] for c in COLUMNS if c['required'] and c['key'] not in col_map]
+        if missing:
+            return False, 'Missing required kg/KHR trade columns: ' + ', '.join(missing), col_map
+        return True, 'Dataset schema validated. Source rows require staged validation.', col_map
 
     @staticmethod
-    def process_trade_data(df: pd.DataFrame, col_map: Dict[str, str] = None, exchange_rate: float = 4000.0) -> Tuple[pd.DataFrame, Dict[str, Any]]:
-        """Cleans, normalizes, and computes metrics based on user-defined exchange rate."""
+    def process_trade_data(df: pd.DataFrame, col_map: Dict[str, str] = None, exchange_rate: float = 4000.0, registry: Optional[Dict] = None) -> Tuple[pd.DataFrame, Dict[str, Any]]:
+        """Compute metrics from an already scoped frame, using revision-pinned names.
+
+        Resolvers are local to this invocation: no module dictionary mutations or
+        cross-request naming state. Registry is mandatory for production callers.
+        """
+        if not np.isfinite(exchange_rate) or exchange_rate <= 0:
+            raise ValueError('Exchange rate must be finite and positive')
+        if registry is None:
+            raise ValueError('A revision-pinned registry is required')
         df_clean = df.copy()
+        countries = {entry['name_en']: entry for entry in registry['country'].values()}
+        countries.update(registry['country'])
+
+        def get_country_info(code):
+            entry = countries[code]
+            return {'EN': entry['name_en'], 'Canonical_KH': entry['name_km'], 'ISO': entry.get('iso3') or 'OTH'}
+
+        def get_hs4_official_name(code):
+            entry = registry['hs4'][code]
+            return entry['name_en'], entry['name_km'], entry['name_en'], entry['name_km']
+
+        def get_hs8_product_info(code):
+            entry = registry['hs8'][code]
+            parent = registry['hs4'][entry['parent_code']]
+            return {'name_en': entry['name_en'], 'name_kh': entry['name_km'], 'category_en': parent['name_en'], 'category_kh': parent['name_km']}
+
+        def get_product_name(code, raw_description=''):
+            return registry['hs8'][code]['name_en']
+
+        def get_product_names_bilingual(code):
+            entry = registry['hs8'][code]
+            return {'en': entry['name_en'], 'km': entry['name_km']}
         
         # Standardize column names if col_map provided
         if col_map:
@@ -138,10 +291,10 @@ class ETLService:
         for col in df_clean.select_dtypes(include=['object', 'string']).columns:
             df_clean[col] = df_clean[col].apply(clean_text)
 
-        # Fallback missing columns if any
-        if 'year' not in df_clean.columns: df_clean['year'] = 2023
-        if 'month' not in df_clean.columns: df_clean['month'] = 1
-        if 'country' not in df_clean.columns: df_clean['country'] = 'Unknown'
+        if not {'year', 'month', 'country'}.issubset(df_clean.columns):
+            raise ValueError('Monthly grain and canonical country are required')
+        df_clean['year'] = df_clean['year'].map(lambda value: integer_number(value, 1900, 2200))
+        df_clean['month'] = df_clean['month'].map(lambda value: integer_number(value, 1, 12))
         
         # Standardize Country Attributes
         def resolve_country(raw_c):
@@ -155,38 +308,29 @@ class ETLService:
         # Use clean English country name as default primary country column
         df_clean['country'] = df_clean['country_en']
 
-        # Clean numeric weight (kg) and value (KHR)
-        if 'weight_kg' not in df_clean.columns or df_clean['weight_kg'].isnull().all():
-            weight_src = df_clean['weight'] if 'weight' in df_clean.columns else 0
-            df_clean['weight_kg'] = pd.to_numeric(
-                weight_src.astype(str).str.replace(r'[^\d.]', '', regex=True), errors='coerce'
-            ).fillna(0.0)
-        else:
-            df_clean['weight_kg'] = pd.to_numeric(df_clean['weight_kg'], errors='coerce').fillna(0.0)
-            
-        if 'val_khr' not in df_clean.columns or df_clean['val_khr'].isnull().all():
-            val_src = df_clean['value'] if 'value' in df_clean.columns else 0
-            df_clean['val_khr'] = pd.to_numeric(
-                val_src.astype(str).str.replace(r'[^\d.]', '', regex=True), errors='coerce'
-            ).fillna(0.0)
-        else:
-            df_clean['val_khr'] = pd.to_numeric(df_clean['val_khr'], errors='coerce').fillna(0.0)
+        # Validate signs/units; never strip a minus sign or silently replace NaN.
+        for target, source in (('weight_kg', 'weight'), ('val_khr', 'value')):
+            if target not in df_clean.columns:
+                if source not in df_clean.columns:
+                    raise ValueError(f'Missing {target}')
+                df_clean[target] = df_clean[source]
+            df_clean[target] = df_clean[target].map(lambda value: float(decimal_number(value)))
         
         # Compute USD value dynamically based on exchange_rate input
-        df_clean['val_usd'] = df_clean['val_khr'] / max(1.0, exchange_rate)
+        df_clean['val_usd'] = df_clean['val_khr'] / exchange_rate
         
         # Format HS codes with fixed widths
         if 'hs4_code' not in df_clean.columns:
-            hs4_src = df_clean['hs4'] if 'hs4' in df_clean.columns else '0000'
-            df_clean['hs4_code'] = hs4_src.apply(lambda x: clean_hs_code(x, 4))
+            hs4_src = df_clean['hs4']
+            df_clean['hs4_code'] = hs4_src.apply(lambda x: hs_code(x, 4))
         else:
-            df_clean['hs4_code'] = df_clean['hs4_code'].apply(lambda x: clean_hs_code(x, 4))
+            df_clean['hs4_code'] = df_clean['hs4_code'].apply(lambda x: hs_code(x, 4))
             
         if 'hs8_code' not in df_clean.columns:
-            hs8_src = df_clean['hs8'] if 'hs8' in df_clean.columns else '00000000'
-            df_clean['hs8_code'] = hs8_src.apply(lambda x: clean_hs_code(x, 8))
+            hs8_src = df_clean['hs8']
+            df_clean['hs8_code'] = hs8_src.apply(lambda x: hs_code(x, 8))
         else:
-            df_clean['hs8_code'] = df_clean['hs8_code'].apply(lambda x: clean_hs_code(x, 8))
+            df_clean['hs8_code'] = df_clean['hs8_code'].apply(lambda x: hs_code(x, 8))
             
         if 'hs4_desc' not in df_clean.columns:
             desc_src = df_clean['desc'] if 'desc' in df_clean.columns else 'Agricultural Product'
@@ -202,7 +346,7 @@ class ETLService:
         total_weight_ton = total_weight_kg / 1000.0
         total_val_khr = df_clean['val_khr'].sum()
         total_val_usd = df_clean['val_usd'].sum()
-        overall_avg_price_usd_per_kg = total_val_usd / max(1.0, total_weight_kg)
+        overall_avg_price_usd_per_kg = unit_price(total_val_usd, total_weight_kg)
         
         # 1. HS8 Commodity Aggregation (Primary Level)
         hs8_agg = df_clean.groupby(['hs8_code', 'hs4_code']).agg(
@@ -213,7 +357,7 @@ class ETLService:
         hs8_agg['weight_ton'] = hs8_agg['weight_kg'] / 1000.0
         
         hs8_agg['revenue_share_pct'] = (hs8_agg['val_usd'] / max(0.001, total_val_usd)) * 100.0
-        hs8_agg['volume_share_pct'] = (hs8_agg['weight_kg'] / max(0.001, total_weight_kg)) * 100.0
+        hs8_agg['volume_share_pct'] = (hs8_agg['weight_kg'] / (total_weight_kg if total_weight_kg > 0 else 1)) * 100.0
         hs8_agg['unit_price_usd_per_kg'] = np.where(hs8_agg['weight_kg'] > 0, hs8_agg['val_usd'] / hs8_agg['weight_kg'], 0.0)
 
         hs8_details = hs8_agg['hs8_code'].apply(get_hs8_product_info)
@@ -232,7 +376,7 @@ class ETLService:
         hs4_agg['weight_ton'] = hs4_agg['weight_kg'] / 1000.0
         
         hs4_agg['revenue_share_pct'] = (hs4_agg['val_usd'] / max(0.001, total_val_usd)) * 100.0
-        hs4_agg['volume_share_pct'] = (hs4_agg['weight_kg'] / max(0.001, total_weight_kg)) * 100.0
+        hs4_agg['volume_share_pct'] = (hs4_agg['weight_kg'] / (total_weight_kg if total_weight_kg > 0 else 1)) * 100.0
         hs4_agg['unit_price_usd_per_kg'] = np.where(hs4_agg['weight_kg'] > 0, hs4_agg['val_usd'] / hs4_agg['weight_kg'], 0.0)
         
         hs4_titles_en, hs4_titles_km, hs4_descs_en, hs4_descs_km = [], [], [], []
@@ -258,7 +402,7 @@ class ETLService:
         ).reset_index()
         country_agg['weight_ton'] = country_agg['weight_kg'] / 1000.0
         country_agg['revenue_share_pct'] = (country_agg['val_usd'] / max(0.001, total_val_usd)) * 100.0
-        country_agg['volume_share_pct'] = (country_agg['weight_kg'] / max(0.001, total_weight_kg)) * 100.0
+        country_agg['volume_share_pct'] = (country_agg['weight_kg'] / (total_weight_kg if total_weight_kg > 0 else 1)) * 100.0
         country_agg['unit_price_usd_per_kg'] = np.where(country_agg['weight_kg'] > 0, country_agg['val_usd'] / country_agg['weight_kg'], 0.0)
         country_agg['share_pct'] = country_agg['revenue_share_pct']
         
@@ -318,7 +462,7 @@ class ETLService:
         country_multi['country_kh'] = cm_cinfo.apply(lambda x: x[1])
         country_multi['country_iso3'] = cm_cinfo.apply(lambda x: x[2])
         country_multi['revenue_share_pct'] = (country_multi['val_usd'] / max(0.001, total_val_usd)) * 100.0
-        country_multi['volume_share_pct'] = (country_multi['weight_kg'] / max(0.001, total_weight_kg)) * 100.0
+        country_multi['volume_share_pct'] = (country_multi['weight_kg'] / (total_weight_kg if total_weight_kg > 0 else 1)) * 100.0
         country_multi['unit_price_usd_per_kg'] = np.where(country_multi['weight_kg'] > 0, country_multi['val_usd'] / country_multi['weight_kg'], 0.0)
 
         monthly_multi = df_clean.groupby(['yyyy_mm', 'hs4_code', 'hs8_code', 'country', 'year']).agg(
@@ -345,7 +489,7 @@ class ETLService:
         commodity_multi['category_km'] = cm_info.apply(lambda d: d['category_kh'])
         commodity_multi['product_name'] = commodity_multi['name_en']
         commodity_multi['revenue_share_pct'] = (commodity_multi['val_usd'] / max(0.001, total_val_usd)) * 100.0
-        commodity_multi['volume_share_pct'] = (commodity_multi['weight_ton'] / max(0.001, total_weight_ton)) * 100.0
+        commodity_multi['volume_share_pct'] = (commodity_multi['weight_ton'] / (total_weight_ton if total_weight_ton > 0 else 1)) * 100.0
 
         # 5. Per-HS8 Commodity Details (for /compare page)
         commodity_details: dict = {}
@@ -357,8 +501,8 @@ class ETLService:
             tot_weight_kg  = float(grp['weight_kg'].sum())
             tot_val_usd    = float(grp['val_usd'].sum())
             tot_val_khr    = float(grp['val_khr'].sum())
-            avg_price_usd  = tot_val_usd / max(1.0, tot_weight_kg)
-            avg_price_khr  = tot_val_khr / max(1.0, tot_weight_kg)
+            avg_price_usd  = unit_price(tot_val_usd, tot_weight_kg)
+            avg_price_khr  = unit_price(tot_val_khr, tot_weight_kg)
             num_markets    = int(grp['country'].nunique())
 
             monthly = grp.groupby('yyyy_mm').agg(
@@ -366,8 +510,8 @@ class ETLService:
                 val_khr=('val_khr', 'sum'),
                 weight_kg=('weight_kg', 'sum')
             ).reset_index().sort_values('yyyy_mm')
-            monthly['price_usd_per_kg'] = monthly['val_usd'] / monthly['weight_kg'].replace(0, 1)
-            monthly['price_khr_per_kg'] = monthly['val_khr'] / monthly['weight_kg'].replace(0, 1)
+            monthly['price_usd_per_kg'] = np.where(monthly['weight_kg'] > 0, monthly['val_usd'] / monthly['weight_kg'], 0.0)
+            monthly['price_khr_per_kg'] = np.where(monthly['weight_kg'] > 0, monthly['val_khr'] / monthly['weight_kg'], 0.0)
             monthly_trend = monthly.to_dict(orient='records')
 
             mkt = grp.groupby('country').agg(
@@ -388,7 +532,7 @@ class ETLService:
 
             raw_vs_processed = None
             pair_info = get_raw_processed_pair(hs4_code_str, hs8_code_str)
-            if pair_info:
+            if pair_info and pair_info['raw_hs8'] in registry['hs8'] and pair_info['processed_hs8'] in registry['hs8']:
                 partner_hs8 = pair_info['processed_hs8'] if pair_info['is_raw'] else pair_info['raw_hs8']
                 partner_grp = df_clean[df_clean['hs8_code'] == partner_hs8]
                 partner_weight_kg = float(partner_grp['weight_kg'].sum())
@@ -410,12 +554,12 @@ class ETLService:
                     'processed_name_km':   proc_names['km'],
                     'raw_val_usd':         round(float(raw_grp['val_usd'].sum()), 2),
                     'raw_weight_kg':       round(float(raw_grp['weight_kg'].sum()), 2),
-                    'raw_price_usd_per_kg':  round(float(raw_grp['val_usd'].sum()) / max(1, float(raw_grp['weight_kg'].sum())), 4),
-                    'raw_price_khr_per_kg':  round(float(raw_grp['val_khr'].sum()) / max(1, float(raw_grp['weight_kg'].sum())), 2),
+                    'raw_price_usd_per_kg':  round(unit_price(float(raw_grp['val_usd'].sum()), float(raw_grp['weight_kg'].sum())), 4),
+                    'raw_price_khr_per_kg':  round(unit_price(float(raw_grp['val_khr'].sum()), float(raw_grp['weight_kg'].sum())), 2),
                     'proc_val_usd':        round(float(proc_grp['val_usd'].sum()), 2),
                     'proc_weight_kg':      round(float(proc_grp['weight_kg'].sum()), 2),
-                    'proc_price_usd_per_kg': round(float(proc_grp['val_usd'].sum()) / max(1, float(proc_grp['weight_kg'].sum())), 4),
-                    'proc_price_khr_per_kg': round(float(proc_grp['val_khr'].sum()) / max(1, float(proc_grp['weight_kg'].sum())), 2),
+                    'proc_price_usd_per_kg': round(unit_price(float(proc_grp['val_usd'].sum()), float(proc_grp['weight_kg'].sum())), 4),
+                    'proc_price_khr_per_kg': round(unit_price(float(proc_grp['val_khr'].sum()), float(proc_grp['weight_kg'].sum())), 2),
                 }
 
             commodity_details[hs8_code_str] = {
@@ -458,6 +602,7 @@ class ETLService:
             'total_weight_ton': float(total_weight_ton),
             'total_val_khr': float(total_val_khr),
             'total_val_usd': float(total_val_usd),
+            'total_transactions': int(len(df_clean)),
             'overall_avg_price_usd_per_kg': float(overall_avg_price_usd_per_kg),
             'hhi_score': float(hhi_score),
             'is_high_risk': bool(hhi_score > 2500),

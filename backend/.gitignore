@@ -10,9 +10,9 @@ __pycache__/
 .pytest_cache/
 .coverage
 
-# Staging files & local storage
+# Staging files & local storage (Auto-created dynamically at runtime)
+storage/
+private/
 *.tmp
 *.duckdb
 *.duckdb.wal
-storage/*.duckdb
-storage/*.duckdb.wal

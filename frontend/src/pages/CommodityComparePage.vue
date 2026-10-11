@@ -178,14 +178,15 @@
         >
           <div class="truncate flex-1 pr-2">
             <span v-if="selectedCodesA.length === 0" class="text-xs text-slate-400 italic">
-              None Selected (Choose commodities...)
+              Choose Commodity A...
             </span>
             <span v-else-if="selectedCodesA.length === 1 && summaryA" class="font-bold text-xs block truncate" :class="isDarkTheme ? 'text-white' : 'text-slate-900'" :title="`[HS ${selectedCodesA[0]}] ${summaryA.name_en}`">
               [HS {{ selectedCodesA[0] }}] {{ summaryA.name_en }}
             </span>
             <span v-else class="font-bold text-xs block truncate" :class="isDarkTheme ? 'text-sky-300' : 'text-sky-700'" :title="selectedCommoditiesTooltipA">
-              🗂️ {{ selectedCodesA.length }} Commodities Selected (Multi-Crop)
+              {{ selectedCodesA.length }} Commodities Selected (Multi-Crop)
             </span>
+
           </div>
           <ChevronDownIcon
             class="w-4 h-4 flex-shrink-0 transition-transform duration-200"
@@ -309,7 +310,7 @@
         <div class="p-2.5 rounded-xl border" :class="isDarkTheme ? 'bg-slate-950/70 border-slate-800' : 'bg-slate-50 border-slate-200/80'">
           <div class="flex items-center justify-between text-xs mb-0.5" :class="isDarkTheme ? 'text-slate-400' : 'text-slate-500'">
             <span class="font-semibold flex items-center gap-1.5" :class="isDarkTheme ? 'text-sky-200' : 'text-sky-800'">
-              <span>💵</span> Revenue ($USD)
+              Revenue ($USD)
             </span>
             <span class="text-[10px] text-slate-400 font-sans">Scale: $k / $M</span>
           </div>
@@ -322,7 +323,7 @@
         <div class="p-2.5 rounded-xl border" :class="isDarkTheme ? 'bg-slate-950/70 border-slate-800' : 'bg-slate-50 border-slate-200/80'">
           <div class="flex items-center justify-between text-xs mb-0.5" :class="isDarkTheme ? 'text-slate-400' : 'text-slate-500'">
             <span class="font-semibold flex items-center gap-1.5" :class="isDarkTheme ? 'text-sky-200' : 'text-sky-800'">
-              <span>📦</span> Export Volume
+              Export Volume
             </span>
             <span class="text-[10px] text-slate-400 font-sans">Scale: kg / Tonnes</span>
           </div>
@@ -335,12 +336,12 @@
         <div class="p-2.5 rounded-xl border" :class="isDarkTheme ? 'bg-slate-950/70 border-slate-800' : 'bg-slate-50 border-slate-200/80'">
           <div class="flex items-center justify-between text-xs mb-0.5" :class="isDarkTheme ? 'text-slate-400' : 'text-slate-500'">
             <span class="font-semibold flex items-center gap-1.5" :class="isDarkTheme ? 'text-sky-200' : 'text-sky-800'">
-              <span>📑</span> Transactions
+              Transactions
             </span>
             <span class="text-[10px] text-slate-400 font-sans">Declarations</span>
           </div>
           <div class="text-base font-black font-mono" :class="isDarkTheme ? 'text-white' : 'text-slate-900'">
-            {{ summaryA?.total_transactions || 0 }} Shipments
+            Not available
           </div>
         </div>
 
@@ -348,7 +349,7 @@
         <div class="p-2.5 rounded-xl border" :class="isDarkTheme ? 'bg-slate-950/70 border-slate-800' : 'bg-slate-50 border-slate-200/80'">
           <div class="flex items-center justify-between text-xs mb-0.5" :class="isDarkTheme ? 'text-slate-400' : 'text-slate-500'">
             <span class="font-semibold flex items-center gap-1.5" :class="isDarkTheme ? 'text-sky-200' : 'text-sky-800'">
-              <span>🌐</span> Destination Markets
+              Destination Markets
             </span>
             <span class="text-[10px] text-slate-400 font-sans">Active Partners</span>
           </div>
@@ -364,10 +365,11 @@
         >
           <div class="flex items-center justify-between text-xs mb-0.5" :class="isDarkTheme ? 'text-sky-300' : 'text-sky-800'">
             <span class="font-bold flex items-center gap-1.5">
-              <span>🏷️</span> Benchmark Avg Price
+              Benchmark Avg Price
             </span>
             <span class="text-[10px] font-sans" :class="isDarkTheme ? 'text-sky-400' : 'text-sky-600'">Unit Rate</span>
           </div>
+
           
           <div v-if="selectedCodesA.length === 1 && summaryA?.avg_price_usd_per_kg">
             <div class="text-base font-black font-mono" :class="isDarkTheme ? 'text-sky-300' : 'text-sky-700'">
@@ -430,14 +432,15 @@
         >
           <div class="truncate flex-1 pr-2">
             <span v-if="selectedCodesB.length === 0" class="text-xs text-slate-400 italic">
-              None Selected (Choose commodities...)
+              Choose Commodity B...
             </span>
             <span v-else-if="selectedCodesB.length === 1 && summaryB" class="font-bold text-xs block truncate" :class="isDarkTheme ? 'text-white' : 'text-slate-900'" :title="`[HS ${selectedCodesB[0]}] ${summaryB.name_en}`">
               [HS {{ selectedCodesB[0] }}] {{ summaryB.name_en }}
             </span>
             <span v-else class="font-bold text-xs block truncate" :class="isDarkTheme ? 'text-amber-300' : 'text-amber-700'" :title="selectedCommoditiesTooltipB">
-              🗂️ {{ selectedCodesB.length }} Commodities Selected (Multi-Crop)
+              {{ selectedCodesB.length }} Commodities Selected (Multi-Crop)
             </span>
+
           </div>
           <ChevronDownIcon
             class="w-4 h-4 flex-shrink-0 transition-transform duration-200"
@@ -561,7 +564,7 @@
         <div class="p-2.5 rounded-xl border" :class="isDarkTheme ? 'bg-slate-950/70 border-slate-800' : 'bg-slate-50 border-slate-200/80'">
           <div class="flex items-center justify-between text-xs mb-0.5" :class="isDarkTheme ? 'text-slate-400' : 'text-slate-500'">
             <span class="font-semibold flex items-center gap-1.5" :class="isDarkTheme ? 'text-amber-200' : 'text-amber-800'">
-              <span>💵</span> Revenue ($USD)
+              Revenue ($USD)
             </span>
             <span class="text-[10px] text-slate-400 font-sans">Scale: $k / $M</span>
           </div>
@@ -574,7 +577,7 @@
         <div class="p-2.5 rounded-xl border" :class="isDarkTheme ? 'bg-slate-950/70 border-slate-800' : 'bg-slate-50 border-slate-200/80'">
           <div class="flex items-center justify-between text-xs mb-0.5" :class="isDarkTheme ? 'text-slate-400' : 'text-slate-500'">
             <span class="font-semibold flex items-center gap-1.5" :class="isDarkTheme ? 'text-amber-200' : 'text-amber-800'">
-              <span>📦</span> Export Volume
+              Export Volume
             </span>
             <span class="text-[10px] text-slate-400 font-sans">Scale: kg / Tonnes</span>
           </div>
@@ -587,12 +590,12 @@
         <div class="p-2.5 rounded-xl border" :class="isDarkTheme ? 'bg-slate-950/70 border-slate-800' : 'bg-slate-50 border-slate-200/80'">
           <div class="flex items-center justify-between text-xs mb-0.5" :class="isDarkTheme ? 'text-slate-400' : 'text-slate-500'">
             <span class="font-semibold flex items-center gap-1.5" :class="isDarkTheme ? 'text-amber-200' : 'text-amber-800'">
-              <span>📑</span> Transactions
+              Transactions
             </span>
             <span class="text-[10px] text-slate-400 font-sans">Declarations</span>
           </div>
           <div class="text-base font-black font-mono" :class="isDarkTheme ? 'text-white' : 'text-slate-900'">
-            {{ summaryB?.total_transactions || 0 }} Shipments
+            Not available
           </div>
         </div>
 
@@ -600,7 +603,7 @@
         <div class="p-2.5 rounded-xl border" :class="isDarkTheme ? 'bg-slate-950/70 border-slate-800' : 'bg-slate-50 border-slate-200/80'">
           <div class="flex items-center justify-between text-xs mb-0.5" :class="isDarkTheme ? 'text-slate-400' : 'text-slate-500'">
             <span class="font-semibold flex items-center gap-1.5" :class="isDarkTheme ? 'text-amber-200' : 'text-amber-800'">
-              <span>🌐</span> Destination Markets
+              Destination Markets
             </span>
             <span class="text-[10px] text-slate-400 font-sans">Active Partners</span>
           </div>
@@ -616,10 +619,11 @@
         >
           <div class="flex items-center justify-between text-xs mb-0.5" :class="isDarkTheme ? 'text-amber-300' : 'text-amber-800'">
             <span class="font-bold flex items-center gap-1.5">
-              <span>🏷️</span> Benchmark Avg Price
+              Benchmark Avg Price
             </span>
             <span class="text-[10px] font-sans" :class="isDarkTheme ? 'text-amber-400' : 'text-amber-600'">Unit Rate</span>
           </div>
+
           
           <div v-if="selectedCodesB.length === 1 && summaryB?.avg_price_usd_per_kg">
             <div class="text-base font-black font-mono" :class="isDarkTheme ? 'text-amber-300' : 'text-amber-700'">
@@ -642,7 +646,7 @@
 
     <!-- ==================== FULLSCREEN ECHARTS MAP CANVAS ==================== -->
     <div 
-      class="relative w-full h-full flex-1 overflow-hidden select-none cursor-grab active:cursor-grabbing" 
+      class="absolute inset-0 w-full h-full overflow-hidden select-none cursor-grab active:cursor-grabbing z-0" 
       style="touch-action: none; -webkit-user-select: none; user-select: none;"
       @mousedown="handleMouseDown"
       @mousemove="handleMouseMove"
@@ -669,7 +673,7 @@
             <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
             <span class="relative inline-flex rounded-full h-2 sm:h-2.5 w-2 sm:w-2.5 bg-emerald-500"></span>
           </span>
-          <span>Origin: Cambodia 🇰🇭</span>
+          <span>Origin: Cambodia</span>
         </div>
 
         <!-- Destination Color Legend Badge -->
@@ -729,8 +733,9 @@
           >
             <div class="flex justify-between items-center text-xs">
               <strong class="font-bold truncate max-w-[190px]" :class="isDarkTheme ? 'text-sky-300' : 'text-sky-800'">
-                🔵 A: {{ selectedCodesA.length === 1 ? (summaryA?.name_en || 'Comm A') : `Group A (${selectedCodesA.length} crops)` }}
+                A: {{ selectedCodesA.length === 1 ? (summaryA?.name_en || 'Comm A') : `Group A (${selectedCodesA.length} crops)` }}
               </strong>
+
               <span class="text-[11px] font-mono font-bold" :class="isDarkTheme ? 'text-sky-400' : 'text-sky-700'">
                 {{ selectedMapCountry.valA ? (selectedCodesA.length === 1 && selectedMapCountry.valA.weight_kg > 0 ? `$${(selectedMapCountry.valA.val_usd / selectedMapCountry.valA.weight_kg).toFixed(2)}/kg` : '') : 'No Export' }}
               </span>
@@ -763,10 +768,11 @@
         </div>
       </div>
 
-      <!-- Main ECharts Component -->
+      <!-- Main ECharts Map Canvas -->
       <v-chart
         ref="chartRef"
         class="w-full h-full cursor-pointer"
+        style="width: 100%; height: 100%; min-height: 100%; display: block;"
         :option="comparativeMapChartOption"
         @click="onMapPointClick"
         autoresize
@@ -850,7 +856,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import * as echarts from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
@@ -863,7 +869,6 @@ import {
   VisualMapComponent,
   GridComponent,
 } from 'echarts/components';
-import VChart from 'vue-echarts';
 import {
   ArrowLeft as ArrowLeftIcon,
   Globe as GlobeIcon,
@@ -876,8 +881,10 @@ import {
   Sun as SunIcon,
   Moon as MoonIcon,
 } from 'lucide-vue-next';
+import VChart from 'vue-echarts';
 import worldGeoJson from '../assets/world.json';
 import { useDatasetStore } from '../stores/datasetStore';
+import { allowedYears } from '../utils/analyticsFilters';
 import type { CommodityListItem, MarketBreakdownItem } from '../types/dataset';
 import {
   getCountryMeta,
@@ -886,9 +893,6 @@ import {
   isSameCountry,
   CAMBODIA_COORDS
 } from '../utils/countryRegistry';
-
-// Register standard Apache ECharts world map GeoJSON
-echarts.registerMap('world', worldGeoJson as any);
 
 echarts.use([
   CanvasRenderer,
@@ -903,6 +907,9 @@ echarts.use([
   VisualMapComponent,
   GridComponent,
 ]);
+
+// Register standard Apache ECharts world map GeoJSON
+echarts.registerMap('world', worldGeoJson as any);
 
 const route = useRoute();
 const router = useRouter();
@@ -943,28 +950,63 @@ let touchLastX = 0;
 let touchLastY = 0;
 let touchStartDist = 0;
 
-onMounted(() => {
-  const queryA = route.query.a as string;
-  const queryB = route.query.b as string;
-  const list = store.dashboardData?.commodity_list || [];
-
-  if (queryA && list.some(c => c.hs8_code === queryA)) {
-    selectedCodesA.value = [queryA];
-  }
-
-  if (queryB && list.some(c => c.hs8_code === queryB)) {
-    selectedCodesB.value = [queryB];
-  }
-
-  document.addEventListener('fullscreenchange', () => {
-    isFullscreen.value = !!document.fullscreenElement;
-  });
-});
-
 const getChartInstance = () => {
   if (!chartRef.value) return null;
   return (chartRef.value as any).chart || chartRef.value;
 };
+
+const resizeChart = () => {
+  const inst = getChartInstance();
+  if (inst && typeof inst.resize === 'function') {
+    inst.resize();
+  }
+};
+
+function initCommoditySelection() {
+  const list = store.dashboardData?.commodity_list || [];
+  if (!list.length) return;
+
+  const queryA = route.query.a as string;
+  const queryB = route.query.b as string;
+
+  if (selectedCodesA.value.length === 0 && queryA && list.some(c => c.hs8_code === queryA)) {
+    selectedCodesA.value = [queryA];
+  }
+
+  if (selectedCodesB.value.length === 0 && queryB && list.some(c => c.hs8_code === queryB)) {
+    selectedCodesB.value = [queryB];
+  }
+}
+
+onMounted(() => {
+  initCommoditySelection();
+
+  document.addEventListener('fullscreenchange', () => {
+    isFullscreen.value = !!document.fullscreenElement;
+    setTimeout(resizeChart, 100);
+  });
+
+  window.addEventListener('resize', resizeChart);
+  nextTick(resizeChart);
+  setTimeout(resizeChart, 50);
+  setTimeout(resizeChart, 200);
+  setTimeout(resizeChart, 500);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('resize', resizeChart);
+});
+
+// Watch when commodity options / dashboardData finishes loading from API
+watch(
+  () => store.dashboardData?.commodity_list,
+  () => {
+    initCommoditySelection();
+    nextTick(resizeChart);
+  },
+  { deep: true, immediate: true }
+);
+
 
 const panMap = (dx: number, dy: number) => {
   const inst = getChartInstance();
@@ -1097,9 +1139,10 @@ const closeDropdowns = () => {
 };
 
 // Available Years dynamically from dataset
-const availableYears = computed<number[]>(() => {
-  return store.dashboardData?.available_years || [2023, 2024];
-});
+const availableYears = computed<number[]>(() => allowedYears(store.dashboardData));
+watch(availableYears, years => {
+  if (selectedYear.value !== 'ALL' && !years.includes(Number(selectedYear.value))) selectedYear.value = 'ALL';
+}, { immediate: true });
 
 // All Commodity Items for selection list
 const commodityOptions = computed<CommodityListItem[]>(() => {
@@ -1180,9 +1223,8 @@ const selectedCommoditiesTooltipB = computed(() => {
 });
 
 // Aggregated Summary for Group A (Dynamically filtered by year)
-const summaryA = computed(() => {
+function summarizeGroup(codes: string[]) {
   const detailsMap = store.dashboardData?.commodity_details || {};
-  const codes = selectedCodesA.value;
   if (!codes || codes.length === 0) return null;
 
   if (codes.length === 1) {
@@ -1226,7 +1268,7 @@ const summaryA = computed(() => {
       avg_price_usd_per_kg: totWeightKg > 0 ? (totValUsd / totWeightKg) : (totValUsd > 0 ? det.avg_price_usd_per_kg : 0),
       avg_price_khr_per_kg: totWeightKg > 0 ? (totValKhr / totWeightKg) : (totValKhr > 0 ? det.avg_price_khr_per_kg : 0),
       num_markets: yearMarkets.length,
-      total_transactions: Math.max(1, Math.round((det.total_transactions || 1) * (ratio || 1))),
+      total_transactions: undefined,
       market_breakdown: yearMarkets,
       monthly_trend: yearMonths,
     };
@@ -1236,7 +1278,6 @@ const summaryA = computed(() => {
   let totValUsd = 0;
   let totValKhr = 0;
   let totWeightKg = 0;
-  let totTrans = 0;
   const marketMap = new Map<string, MarketBreakdownItem>();
 
   for (const code of codes) {
@@ -1246,7 +1287,6 @@ const summaryA = computed(() => {
         totValUsd += det.total_val_usd || 0;
         totValKhr += det.total_val_khr || 0;
         totWeightKg += det.total_weight_kg || 0;
-        totTrans += det.total_transactions || det.market_breakdown?.length || 0;
         
         for (const m of det.market_breakdown || []) {
           if (!marketMap.has(m.country)) {
@@ -1269,7 +1309,6 @@ const summaryA = computed(() => {
         totValUsd += yValUsd;
         totValKhr += yValKhr;
         totWeightKg += yWeightKg;
-        totTrans += Math.max(1, Math.round((det.total_transactions || det.market_breakdown?.length || 1) * (ratio || 1)));
 
         const yearMarketItems = (det.yearly_markets && det.yearly_markets.length > 0)
           ? det.yearly_markets.filter(m => m.year === selYr)
@@ -1316,159 +1355,19 @@ const summaryA = computed(() => {
     total_val_usd: totValUsd,
     total_val_khr: totValKhr,
     total_weight_kg: totWeightKg,
-    total_transactions: totTrans,
+    total_transactions: undefined,
     num_markets: finalMarkets.length,
     avg_price_usd_per_kg: null, // Suppress blended average price for multi-crop
     avg_price_khr_per_kg: null,
     market_breakdown: finalMarkets,
   };
-});
+}
 
-// Aggregated Summary for Group B (Dynamically filtered by year)
-const summaryB = computed(() => {
-  const detailsMap = store.dashboardData?.commodity_details || {};
-  const codes = selectedCodesB.value;
-  if (!codes || codes.length === 0) return null;
-
-  if (codes.length === 1) {
-    const det = detailsMap[codes[0]];
-    if (!det) return null;
-    if (selectedYear.value === 'ALL') {
-      return det;
-    }
-    const selYr = parseInt(selectedYear.value, 10);
-    const yearMonths = (det.monthly_trend || []).filter(m => m.yyyy_mm && m.yyyy_mm.startsWith(selectedYear.value));
-    const totValUsd = yearMonths.reduce((s, m) => s + (m.val_usd || 0), 0);
-    const totValKhr = yearMonths.reduce((s, m) => s + (m.val_khr || 0), 0);
-    const totWeightKg = yearMonths.reduce((s, m) => s + (m.weight_kg || 0), 0);
-    const ratio = det.total_val_usd > 0 ? (totValUsd / det.total_val_usd) : (det.total_weight_kg > 0 ? totWeightKg / det.total_weight_kg : 1);
-
-    const yearMarkets: MarketBreakdownItem[] = (det.yearly_markets && det.yearly_markets.length > 0)
-      ? det.yearly_markets
-          .filter(m => m.year === selYr)
-          .map(m => ({
-            country: m.country,
-            val_usd: m.val_usd,
-            val_khr: m.val_khr,
-            weight_kg: m.weight_kg,
-            share_pct: totValUsd > 0 ? (m.val_usd / totValUsd) * 100 : 0
-          }))
-          .sort((a, b) => b.val_usd - a.val_usd)
-      : (det.market_breakdown || []).map(m => ({
-          ...m,
-          val_usd: m.val_usd * ratio,
-          val_khr: m.val_khr * ratio,
-          weight_kg: m.weight_kg * ratio,
-          share_pct: totValUsd > 0 ? ((m.val_usd * ratio) / totValUsd) * 100 : 0
-        })).filter(m => m.val_usd > 0 || m.weight_kg > 0);
-
-    return {
-      ...det,
-      total_val_usd: totValUsd,
-      total_val_khr: totValKhr,
-      total_weight_kg: totWeightKg,
-      total_weight_ton: totWeightKg / 1000,
-      avg_price_usd_per_kg: totWeightKg > 0 ? (totValUsd / totWeightKg) : (totValUsd > 0 ? det.avg_price_usd_per_kg : 0),
-      avg_price_khr_per_kg: totWeightKg > 0 ? (totValKhr / totWeightKg) : (totValKhr > 0 ? det.avg_price_khr_per_kg : 0),
-      num_markets: yearMarkets.length,
-      total_transactions: Math.max(1, Math.round((det.total_transactions || 1) * (ratio || 1))),
-      market_breakdown: yearMarkets,
-      monthly_trend: yearMonths,
-    };
-  }
-
-  let totValUsd = 0;
-  let totValKhr = 0;
-  let totWeightKg = 0;
-  let totTrans = 0;
-  const marketMap = new Map<string, MarketBreakdownItem>();
-
-  for (const code of codes) {
-    const det = detailsMap[code];
-    if (det) {
-      if (selectedYear.value === 'ALL') {
-        totValUsd += det.total_val_usd || 0;
-        totValKhr += det.total_val_khr || 0;
-        totWeightKg += det.total_weight_kg || 0;
-        totTrans += det.total_transactions || det.market_breakdown?.length || 0;
-        
-        for (const m of det.market_breakdown || []) {
-          if (!marketMap.has(m.country)) {
-            marketMap.set(m.country, { ...m });
-          } else {
-            const cur = marketMap.get(m.country)!;
-            cur.val_usd += m.val_usd;
-            cur.val_khr += m.val_khr;
-            cur.weight_kg += m.weight_kg;
-          }
-        }
-      } else {
-        const selYr = parseInt(selectedYear.value, 10);
-        const yearMonths = (det.monthly_trend || []).filter(m => m.yyyy_mm && m.yyyy_mm.startsWith(selectedYear.value));
-        const yValUsd = yearMonths.reduce((s, m) => s + (m.val_usd || 0), 0);
-        const yValKhr = yearMonths.reduce((s, m) => s + (m.val_khr || 0), 0);
-        const yWeightKg = yearMonths.reduce((s, m) => s + (m.weight_kg || 0), 0);
-        const ratio = det.total_val_usd > 0 ? (yValUsd / det.total_val_usd) : (det.total_weight_kg > 0 ? yWeightKg / det.total_weight_kg : 1);
-
-        totValUsd += yValUsd;
-        totValKhr += yValKhr;
-        totWeightKg += yWeightKg;
-        totTrans += Math.max(1, Math.round((det.total_transactions || det.market_breakdown?.length || 1) * (ratio || 1)));
-
-        const yearMarketItems = (det.yearly_markets && det.yearly_markets.length > 0)
-          ? det.yearly_markets.filter(m => m.year === selYr)
-          : (det.market_breakdown || []).map(m => ({
-              country: m.country,
-              year: selYr,
-              val_usd: m.val_usd * ratio,
-              val_khr: m.val_khr * ratio,
-              weight_kg: m.weight_kg * ratio,
-            }));
-
-        for (const m of yearMarketItems) {
-          if (m.val_usd > 0 || m.weight_kg > 0) {
-            if (!marketMap.has(m.country)) {
-              marketMap.set(m.country, {
-                country: m.country,
-                val_usd: m.val_usd,
-                val_khr: m.val_khr,
-                weight_kg: m.weight_kg,
-                share_pct: 0,
-              });
-            } else {
-              const cur = marketMap.get(m.country)!;
-              cur.val_usd += m.val_usd;
-              cur.val_khr += m.val_khr;
-              cur.weight_kg += m.weight_kg;
-            }
-          }
-        }
-      }
-    }
-  }
-
-  const finalMarkets = Array.from(marketMap.values()).map(m => ({
-    ...m,
-    share_pct: totValUsd > 0 ? (m.val_usd / totValUsd) * 100 : 0
-  })).sort((a, b) => b.val_usd - a.val_usd);
-
-  return {
-    hs8_code: 'MULTI',
-    name_en: `${codes.length} Commodities`,
-    name_km: `${codes.length} មុខទំនិញ`,
-    total_val_usd: totValUsd,
-    total_val_khr: totValKhr,
-    total_weight_kg: totWeightKg,
-    total_transactions: totTrans,
-    num_markets: finalMarkets.length,
-    avg_price_usd_per_kg: null,
-    avg_price_khr_per_kg: null,
-    market_breakdown: finalMarkets,
-  };
-});
+const summaryA = computed(() => summarizeGroup(selectedCodesA.value));
+const summaryB = computed(() => summarizeGroup(selectedCodesB.value));
 
 const goBack = () => {
-  router.push('/');
+  router.push('/dashboard');
 };
 
 const formatRevenue = (valUsd: number): string => {
@@ -1739,6 +1638,7 @@ const comparativeMapChartOption = computed(() => {
           scale: 4,
           period: 3,
         },
+        symbolSize: 16,
         data: [cambodiaHub],
       },
     ]

@@ -1,7 +1,9 @@
 import { defineStore } from 'pinia';
-import { ref, computed } from 'vue';
+import { ref, shallowRef, computed, onScopeDispose } from 'vue';
 import type { DashboardPayload, ChatMessage } from '../types/dataset';
-import { fetchCurrentAnalytics, uploadDataset, recalculateAnalytics, sendChatMessage } from '../services/api';
+import { apiError, fetchCurrentAnalytics, isPublicationChanged, sendChatMessage } from '../services/api';
+import { onPrivateReset, privateEpoch } from '../services/privateState';
+import { useAuthStore } from './authStore';
 
 
 function createInitialDashboardPayload(): DashboardPayload {
@@ -20,11 +22,11 @@ function createInitialDashboardPayload(): DashboardPayload {
         description: 'Awaiting dataset ingestion'
       },
       {
-        label: 'Revenue (KHR)',
-        value: '៛0.00 KHR',
+        label: 'Total Transactions',
+        value: '0 Records',
         numeric_val: 0,
-        unit: 'KHR',
-        description: 'Raw trade currency total'
+        unit: 'Records',
+        description: 'Total customs trade declarations recorded'
       },
       {
         label: 'Export Volume',
@@ -61,10 +63,16 @@ function createInitialDashboardPayload(): DashboardPayload {
 }
 
 export const useDatasetStore = defineStore('dataset', () => {
-  const dashboardData = ref<DashboardPayload>(createInitialDashboardPayload());
+  const auth = useAuthStore();
+  const hasLoaded = ref(false);
+  const dashboardData = shallowRef<DashboardPayload>(createInitialDashboardPayload());
   const exchangeRate = ref<number>(4000);
+
   const isLoading = ref<boolean>(false);
   const validationError = ref<string | null>(null);
+  const publicationNotice = ref<string | null>(null);
+  let analyticsRequest: Promise<void> | null = null;
+  let scopeVersion = 0;
   const isChatOpen = ref<boolean>(false);
   const isChatProcessing = ref<boolean>(false);
   
@@ -76,6 +84,7 @@ export const useDatasetStore = defineStore('dataset', () => {
   const filterMetric = ref<'USD' | 'TONNES'>('USD');
   const topNLimit = ref<number>(5);
 
+  const selectedHsCodes = computed(() => filterHsCodes.value.length ? filterHsCodes.value : filterHsCode.value !== 'ALL' ? [filterHsCode.value] : []);
   const isSingleCommoditySelected = computed<boolean>(() => {
     if (filterHsCodes.value.length === 1) return true;
     if (filterHsCodes.value.length === 0 && filterHsCode.value !== 'ALL') return true;
@@ -107,77 +116,86 @@ export const useDatasetStore = defineStore('dataset', () => {
     topNLimit.value = 5;
   }
 
-  const chatMessages = ref<ChatMessage[]>([
-    {
-      id: 'welcome',
-      sender: 'ai',
-      text: 'Hello! 👋 I am your AI Trade Assistant. Ask me any question grounded strictly in your uploaded trade dataset!',
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    }
-  ]);
-
-  async function fetchMasterData() {
-    isLoading.value = true;
+  const chatMessages = ref<ChatMessage[]>([]);
+  function clearPrivateData() {
+    scopeVersion++;
+    analyticsRequest = null;
+    publicationNotice.value = null;
+    dashboardData.value = createInitialDashboardPayload();
+    exchangeRate.value = 4000;
+    chatMessages.value = [];
+    isChatOpen.value = false;
+    isChatProcessing.value = false;
+    isLoading.value = false;
+    hasLoaded.value = false;
     validationError.value = null;
-    try {
-      const data = await fetchCurrentAnalytics();
-      if (data && data.is_valid_trade_data) {
-        dashboardData.value = data;
-        if (data.exchange_rate) {
-          exchangeRate.value = data.exchange_rate;
-        }
-      } else {
-        dashboardData.value = createInitialDashboardPayload();
-      }
-    } catch (err: any) {
-      console.warn('Could not auto-fetch current dataset (using preview mode):', err);
-    } finally {
-      isLoading.value = false;
-    }
+    resetAllFilters();
+  }
+  onScopeDispose(onPrivateReset(clearPrivateData));
+
+  function resetPublicationContext() {
+    scopeVersion++;
+    resetAllFilters();
+    chatMessages.value = [];
+    isChatProcessing.value = false;
   }
 
-  async function handleFileUpload(file: File) {
+  // One request at a time; forced refreshes bypass only the loaded cache.
+  function fetchMasterData(force = false): Promise<void> {
+    if (!auth.canAccessMembers) return Promise.resolve();
+    if (analyticsRequest) return analyticsRequest;
+    if (hasLoaded.value && !force) return Promise.resolve();
+    const epoch = privateEpoch;
+    const previousId = dashboardData.value.publication?.id;
+    const rate = hasLoaded.value ? exchangeRate.value : undefined;
     isLoading.value = true;
     validationError.value = null;
-
-    try {
-      const data = await uploadDataset(file, exchangeRate.value);
-      if (!data.is_valid_trade_data) {
-        validationError.value = data.validation_message || 'Uploaded file format is invalid for trade analytics.';
-        dashboardData.value = createInitialDashboardPayload();
-      } else {
-        dashboardData.value = data;
+    const request = (async () => {
+      try {
+        const data = await fetchCurrentAnalytics(rate);
+        if (epoch !== privateEpoch || !auth.canAccessMembers) return;
+        if (previousId !== data.publication?.id) {
+          resetPublicationContext();
+          if (previousId) publicationNotice.value = 'Published analytics changed. Filters and chat were cleared. Please review the updated charts and ask your question again.';
+        }
+        if (data.is_valid_trade_data) {
+          dashboardData.value = data;
+          exchangeRate.value = data.exchange_rate;
+        } else {
+          dashboardData.value = createInitialDashboardPayload();
+          resetPublicationContext();
+          validationError.value = data.validation_message || 'No published trade data is available yet.';
+        }
+        hasLoaded.value = true;
+      } catch (err) {
+        if (epoch === privateEpoch) {
+          validationError.value = apiError(err, 'Published analytics are unavailable. Please try again later.');
+          // Failed repricing must not make chat/labels use a rate different from
+          // the still-visible charts. Retain their successfully loaded rate.
+          if (dashboardData.value.is_valid_trade_data) exchangeRate.value = dashboardData.value.exchange_rate;
+        }
+      } finally {
+        if (epoch === privateEpoch) { isLoading.value = false; analyticsRequest = null; }
       }
-    } catch (err: any) {
-      validationError.value = err.response?.data?.detail || 'Failed to upload and process dataset. Please try again.';
-    } finally {
-      isLoading.value = false;
-    }
+    })();
+    analyticsRequest = request;
+    return request;
   }
 
   async function setExchangeRate(newRate: number) {
-    if (newRate <= 0) return;
+    if (!Number.isFinite(newRate) || newRate <= 0 || !auth.canAccessMembers || isLoading.value) return;
     exchangeRate.value = newRate;
-    
-    if (dashboardData.value && dashboardData.value.session_id) {
-      isLoading.value = true;
-      try {
-        const updated = await recalculateAnalytics(dashboardData.value.session_id, newRate);
-        dashboardData.value = updated;
-      } catch (err) {
-        console.error('Failed to recalculate metrics:', err);
-      } finally {
-        isLoading.value = false;
-      }
-    }
+    if (dashboardData.value.is_valid_trade_data) await fetchMasterData(true);
   }
 
   function toggleChat() {
-    isChatOpen.value = !isChatOpen.value;
+    if (auth.canAccessMembers) isChatOpen.value = !isChatOpen.value;
   }
 
   async function postChatMessage(userQuestion: string) {
-    if (!userQuestion.trim() || !dashboardData.value || isChatProcessing.value) return;
+    if (!userQuestion.trim() || !auth.canAccessMembers || !dashboardData.value.is_valid_trade_data || isChatProcessing.value || isLoading.value) return;
+    const epoch = privateEpoch;
+    const version = scopeVersion;
 
     const userMsg: ChatMessage = {
       id: Date.now().toString(),
@@ -189,7 +207,8 @@ export const useDatasetStore = defineStore('dataset', () => {
     isChatProcessing.value = true;
 
     try {
-      const res = await sendChatMessage(dashboardData.value.session_id, userQuestion, exchangeRate.value);
+      const res = await sendChatMessage(dashboardData.value.session_id, userQuestion, exchangeRate.value, dashboardData.value.publication?.id);
+      if (epoch !== privateEpoch || version !== scopeVersion || !auth.canAccessMembers) return;
       const aiMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
         sender: 'ai',
@@ -199,6 +218,17 @@ export const useDatasetStore = defineStore('dataset', () => {
       };
       chatMessages.value.push(aiMsg);
     } catch (err) {
+      if (epoch !== privateEpoch || version !== scopeVersion) return;
+      if (isPublicationChanged(err)) {
+        // A request started before the conflict may still contain the old publication.
+        if (analyticsRequest) await analyticsRequest;
+        if (epoch !== privateEpoch || !auth.canAccessMembers) return;
+        resetPublicationContext();
+        dashboardData.value = createInitialDashboardPayload();
+        publicationNotice.value = 'Published analytics changed. Filters and chat were cleared. Please review the updated charts and ask your question again.';
+        await fetchMasterData(true);
+        return; // Never retry an old chart explanation against a new publication.
+      }
       chatMessages.value.push({
         id: (Date.now() + 1).toString(),
         sender: 'ai',
@@ -206,27 +236,30 @@ export const useDatasetStore = defineStore('dataset', () => {
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       });
     } finally {
-      isChatProcessing.value = false;
+      if (epoch === privateEpoch && version === scopeVersion) isChatProcessing.value = false;
     }
   }
 
-  function askAboutChart(chartTitle: string, chartMeaningText?: string) {
-    isChatOpen.value = true;
-    const contextInfo = chartMeaningText ? ` (Visual Context: ${chartMeaningText})` : '';
-    const promptText = `As a Senior Data Analyst, please explain the key data insights and analytical breakdown for the chart "${chartTitle}"${contextInfo} based strictly on the trade dataset.`;
-    postChatMessage(promptText);
+  function askAboutChart(_chartTitle?: string, _chartMeaningText?: string) {
+    if (auth.canAccessMembers) {
+      isChatOpen.value = true;
+    }
   }
 
   return {
     dashboardData,
+    hasLoaded,
+    clearPrivateData,
     exchangeRate,
     isLoading,
     validationError,
+    publicationNotice,
     isChatOpen,
     isChatProcessing,
     chatMessages,
     filterHsCode,
     filterHsCodes,
+    selectedHsCodes,
     isSingleCommoditySelected,
     selectedSingleHsCode,
     filterYear,
@@ -236,7 +269,6 @@ export const useDatasetStore = defineStore('dataset', () => {
     isFiltered,
     resetAllFilters,
     fetchMasterData,
-    handleFileUpload,
     setExchangeRate,
     toggleChat,
     postChatMessage,

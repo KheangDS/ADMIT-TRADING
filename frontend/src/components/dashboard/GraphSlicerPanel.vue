@@ -155,7 +155,7 @@
           v-model="store.filterYear"
           class="w-full px-3 py-2 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500 transition-colors"
         >
-          <option value="ALL">📅 All Years</option>
+          <option value="ALL">All Years</option>
           <option
             v-for="yr in availableYears"
             :key="yr"
@@ -176,7 +176,7 @@
           v-model="store.filterCountry"
           class="w-full px-3 py-2 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500 transition-colors"
         >
-          <option value="ALL">🌏 All Markets (Worldwide)</option>
+          <option value="ALL">All Markets (Worldwide)</option>
           <option
             v-for="country in availableCountries"
             :key="country"
@@ -206,7 +206,7 @@
             ]"
             title="Display metrics in Dollar Value ($ USD / Thousands / Millions)"
           >
-            💵 Value ($USD)
+            Value ($USD)
           </button>
           <button
             @click="store.filterMetric = 'TONNES'"
@@ -218,7 +218,7 @@
             ]"
             title="Display metrics in Export Volume (Kilograms / Metric Tonnes)"
           >
-            ⚖️ Volume (Tonnes)
+            Volume (Tonnes)
           </button>
         </div>
       </div>
@@ -229,9 +229,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { Filter as FilterIcon, RotateCcw as RotateCcwIcon, ChevronDown as ChevronDownIcon } from 'lucide-vue-next';
 import { useDatasetStore } from '../../stores/datasetStore';
+import { allowedYears } from '../../utils/analyticsFilters';
 
 const store = useDatasetStore();
 const isDropdownOpen = ref<boolean>(false);
@@ -266,14 +267,15 @@ const commodityDisplayLabel = computed(() => {
   const total = availableHs8Commodities.value.length;
   const count = store.filterHsCodes.length;
   if (count === 0 || count === total) {
-    return `🌐 All HS8 Commodities (${total})`;
+    return `All HS8 Commodities (${total})`;
   }
   if (count === 1) {
     const item = availableHs8Commodities.value.find(c => c.hs8_code === store.filterHsCodes[0]);
     return item ? `HS ${item.hs8_code} · ${item.name_en}` : '1 Commodity Selected';
   }
-  return `🗂️ ${count} Commodities Selected`;
+  return `${count} Commodities Selected`;
 });
+
 
 const selectAllCommodities = () => {
   store.filterHsCodes = availableHs8Commodities.value.map(c => c.hs8_code);
@@ -288,19 +290,10 @@ const resetFilters = () => {
   isDropdownOpen.value = false;
 };
 
-const availableYears = computed(() => {
-  if (store.dashboardData?.available_years && store.dashboardData.available_years.length > 0) {
-    return store.dashboardData.available_years;
-  }
-  const years = new Set<number>();
-  for (const item of store.dashboardData?.level1_charts?.find(c => c.chart_id === 'chart_seasonality')?.data || []) {
-    if (item.name && item.name.includes('-')) {
-      const yr = parseInt(item.name.split('-')[0]);
-      if (!isNaN(yr)) years.add(yr);
-    }
-  }
-  return years.size > 0 ? Array.from(years).sort() : [2023, 2024];
-});
+const availableYears = computed(() => allowedYears(store.dashboardData));
+watch(availableYears, years => {
+  if (store.filterYear !== 'ALL' && !years.includes(Number(store.filterYear))) store.filterYear = 'ALL';
+}, { immediate: true });
 
 const availableCountries = computed(() => {
   if (store.dashboardData?.available_countries && store.dashboardData.available_countries.length > 0) {

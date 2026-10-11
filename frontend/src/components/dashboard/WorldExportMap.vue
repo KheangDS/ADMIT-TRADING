@@ -23,7 +23,7 @@
             :class="activeMetric === 'VOLUME' ? 'bg-white text-sky-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'"
             title="Scale: kg / Metric Tonnes"
           >
-            📦 Volume (Tonnes/kg)
+            Volume (Tonnes/kg)
           </button>
           <button
             @click="activeMetric = 'REVENUE'"
@@ -31,7 +31,7 @@
             :class="activeMetric === 'REVENUE' ? 'bg-white text-sky-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'"
             title="Scale: $k / $M USD"
           >
-            💰 Revenue ($USD)
+            Revenue ($USD)
           </button>
         </div>
 
@@ -44,7 +44,7 @@
             : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 shadow-2xs'"
           :title="isDarkTheme ? 'Switch to Light Theme' : 'Switch to Dark Theme'"
         >
-          <span>{{ isDarkTheme ? '🌙 Dark' : '☀️ Light' }}</span>
+          <span>{{ isDarkTheme ? 'Dark Theme' : 'Light Theme' }}</span>
         </button>
       </div>
     </div>
@@ -72,7 +72,7 @@
           <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
           <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
         </span>
-        <span class="font-bold" :class="isDarkTheme ? 'text-white' : 'text-slate-900'">Origin: Cambodia 🇰🇭</span>
+        <span class="font-bold" :class="isDarkTheme ? 'text-white' : 'text-slate-900'">Origin: Cambodia</span>
         <span class="text-slate-400 text-[11px] font-sans">(កម្ពុជា)</span>
       </div>
 
@@ -83,9 +83,10 @@
       >
         <span class="text-slate-400">Scale: </span>
         <strong :class="activeMetric === 'VOLUME' ? (isDarkTheme ? 'text-sky-400' : 'text-sky-600') : (isDarkTheme ? 'text-amber-400' : 'text-amber-600')">
-          {{ activeMetric === 'VOLUME' ? '📦 Volume (kg / Tonnes)' : '💰 Value ($k / $M USD)' }}
+          {{ activeMetric === 'VOLUME' ? 'Volume (kg / Tonnes)' : 'Value ($k / $M USD)' }}
         </strong>
       </div>
+
 
       <!-- In-Map Country Intelligence Floating Card (Triggered by Map Click) -->
       <div
@@ -180,7 +181,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import * as echarts from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import { MapChart, ScatterChart, EffectScatterChart, LinesChart } from 'echarts/charts';
@@ -206,9 +207,6 @@ import {
   CAMBODIA_COORDS
 } from '../../utils/countryRegistry';
 
-// Register standard Apache ECharts world map GeoJSON
-echarts.registerMap('world', worldGeoJson as any);
-
 echarts.use([
   CanvasRenderer,
   MapChart,
@@ -222,6 +220,9 @@ echarts.use([
   VisualMapComponent,
   GridComponent,
 ]);
+
+// Register standard Apache ECharts world map GeoJSON
+echarts.registerMap('world', worldGeoJson as any);
 
 const props = defineProps<{
   title?: string;
@@ -248,10 +249,37 @@ let touchLastX = 0;
 let touchLastY = 0;
 let touchStartDist = 0;
 
+let resizeObserver: ResizeObserver | null = null;
+
 const getChartInstance = () => {
   if (!chartRef.value) return null;
   return (chartRef.value as any).chart || chartRef.value;
 };
+
+const resizeChart = () => {
+  const inst = getChartInstance();
+  if (inst && typeof inst.resize === 'function') {
+    inst.resize();
+  }
+};
+
+onMounted(() => {
+  window.addEventListener('resize', resizeChart);
+  nextTick(() => {
+    resizeChart();
+  });
+  setTimeout(resizeChart, 50);
+  setTimeout(resizeChart, 200);
+  setTimeout(resizeChart, 500);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('resize', resizeChart);
+  if (resizeObserver) {
+    resizeObserver.disconnect();
+    resizeObserver = null;
+  }
+});
 
 const panMap = (dx: number, dy: number) => {
   const inst = getChartInstance();

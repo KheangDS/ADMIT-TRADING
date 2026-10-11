@@ -4,19 +4,31 @@
     <!-- Executive Overview Header -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-3 sm:pb-4 border-b border-slate-200 gap-2 sm:gap-3">
       <div>
-        <h2 class="text-lg sm:text-xl font-black text-slate-900 tracking-tight">Export Analytics Overview</h2>
+        <div class="flex flex-wrap items-center gap-2">
+          <h2 class="text-lg sm:text-xl font-black text-slate-900 tracking-tight">Export Analytics Overview</h2>
+          <span 
+            v-if="liveDisplayPeriod" 
+            class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-sky-50 text-sky-700 border border-sky-200/80 shadow-2xs font-mono"
+            :title="`Current reporting data period: ${liveDisplayPeriod}`"
+          >
+            <Calendar class="w-3 h-3 text-sky-600 flex-shrink-0" />
+            <span>{{ liveDisplayPeriod }}</span>
+          </span>
+        </div>
         <p class="text-xs text-slate-500 mt-0.5">High-level Cambodian agricultural trade performance & product-level insights</p>
       </div>
     </div>
 
     <!-- Executive KPI Cards Grid (5 Core Pillars) -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+    <div class="grid grid-cols-2 lg:grid-cols-5 gap-2.5 sm:gap-3.5 lg:gap-4">
       <KpiCard
-        v-for="kpi in store.dashboardData.summary_kpis"
+        v-for="(kpi, idx) in store.dashboardData.summary_kpis"
         :key="kpi.label"
         :label="kpi.label"
         :value="kpi.value"
         :description="kpi.description"
+        :class="{ 'col-span-2 w-full max-w-[260px] sm:max-w-[280px] lg:max-w-none mx-auto lg:col-span-1': idx === 0 }"
+        :is-hero="idx === 0"
       />
     </div>
 
@@ -186,7 +198,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { Sparkles, Globe, TrendingUp, Cpu } from 'lucide-vue-next';
+import { Sparkles, Globe, TrendingUp, Cpu, Calendar } from 'lucide-vue-next';
 import { useDatasetStore } from '../../stores/datasetStore';
 import KpiCard from './KpiCard.vue';
 import GraphSlicerPanel from './GraphSlicerPanel.vue';
@@ -195,11 +207,37 @@ import ChartCustomizer from './ChartCustomizer.vue';
 const store = useDatasetStore();
 const tableTopN = ref<number>(10);
 
+function formatDisplayMonth(ym: string | undefined | null): string {
+  if (!ym) return '';
+  const clean = ym.trim();
+  if (/^\d{4}-\d{2}$/.test(clean)) {
+    const [y, m] = clean.split('-').map(Number);
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const monthName = monthNames[m - 1];
+    if (monthName) return `${monthName} ${y}`;
+  }
+  return clean;
+}
+
+const liveDisplayPeriod = computed(() => {
+  const pub = store.dashboardData?.publication;
+  if (pub?.start_month && pub?.end_month) {
+    return `${formatDisplayMonth(pub.start_month)} – ${formatDisplayMonth(pub.end_month)}`;
+  }
+  const begin = store.dashboardData?.begin_date;
+  const end = store.dashboardData?.end_date;
+  if (begin && end) {
+    return `${formatDisplayMonth(begin)} – ${formatDisplayMonth(end)}`;
+  }
+  return '';
+});
+
 const formatTableVolume = (tonnes: number): string => {
   if (!tonnes || tonnes === 0) return '0 t';
   if (tonnes < 1) {
-    const kg = Math.round(tonnes * 1000 * 10) / 10;
-    return `${kg.toLocaleString()} kg`;
+    const kg = Math.round(tonnes * 1000 * 100) / 100;
+    const decimals = (kg < 10 && kg % 1 !== 0) ? 2 : (kg % 1 === 0 ? 0 : 1);
+    return `${kg.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: 2 })} kg`;
   }
   return `${(Math.round(tonnes * 10) / 10).toLocaleString()} Tonnes`;
 };

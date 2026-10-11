@@ -18,6 +18,14 @@
           <span class="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600">
             Chapter {{ commodity.hs4_code }}
           </span>
+          <span 
+            v-if="liveDisplayPeriod" 
+            class="inline-flex items-center gap-1.5 text-xs font-mono font-bold px-2.5 py-1 rounded-lg bg-sky-50 text-sky-700 border border-sky-200/80 shadow-2xs"
+            :title="`Current reporting data period: ${liveDisplayPeriod}`"
+          >
+            <CalendarIcon class="w-3.5 h-3.5 text-sky-600 flex-shrink-0" />
+            <span>{{ liveDisplayPeriod }}</span>
+          </span>
         </div>
 
         <!-- Bilingual Product Title -->
@@ -33,72 +41,82 @@
       <div class="flex items-center gap-2 self-stretch md:self-auto justify-end">
         <button
           @click="goToCompare"
-          class="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-700 hover:to-indigo-700 text-white font-bold text-xs rounded-xl shadow-sm hover:shadow transition-all"
+          class="cursor-pointer flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-700 hover:to-indigo-700 text-white font-bold text-xs rounded-xl shadow-sm hover:shadow transition-all"
         >
-          <span>⚖️ Compare with Another HS8</span>
+          <ScaleIcon class="w-3.5 h-3.5" />
+          <span>Compare with Another HS8</span>
           <ArrowRightIcon class="w-3.5 h-3.5" />
         </button>
       </div>
     </div>
 
     <!-- 4 Core KPI Metric Cards -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
       <!-- Total Revenue -->
-      <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
-        <div class="flex items-center justify-between text-slate-500 text-xs mb-1">
-          <span class="font-semibold uppercase tracking-wider">Total Export Value</span>
-          <span class="p-1.5 rounded-lg bg-amber-50 text-amber-600">💰</span>
+      <div class="bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-100 shadow-xs flex flex-col justify-between items-center text-center">
+        <div class="flex items-center justify-center gap-1.5 text-slate-500 text-xs mb-1 w-full">
+          <span class="p-1 rounded-lg bg-amber-50 text-amber-600 text-xs flex items-center justify-center">
+            <DollarSignIcon class="w-3.5 h-3.5" />
+          </span>
+          <span class="font-bold text-[10px] sm:text-xs text-slate-500 uppercase tracking-wider truncate">Total Export Value</span>
         </div>
-        <div class="text-2xl font-black text-slate-900">
+        <div class="text-xl sm:text-2xl font-black text-slate-900 mt-1">
           {{ formatRevenue(commodity.total_val_usd) }}
         </div>
-        <p class="text-xs text-slate-500 mt-1 font-mono">
+        <p class="text-[11px] sm:text-xs text-slate-500 mt-1">
           ≈ {{ formatKhrBillions(commodity.total_val_khr) }}
         </p>
       </div>
 
       <!-- Total Volume -->
-      <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
-        <div class="flex items-center justify-between text-slate-500 text-xs mb-1">
-          <span class="font-semibold uppercase tracking-wider">Total Export Volume</span>
-          <span class="p-1.5 rounded-lg bg-sky-50 text-sky-600">📦</span>
+      <div class="bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-100 shadow-xs flex flex-col justify-between items-center text-center">
+        <div class="flex items-center justify-center gap-1.5 text-slate-500 text-xs mb-1 w-full">
+          <span class="p-1 rounded-lg bg-sky-50 text-sky-600 text-xs flex items-center justify-center">
+            <PackageIcon class="w-3.5 h-3.5" />
+          </span>
+          <span class="font-bold text-[10px] sm:text-xs text-slate-500 uppercase tracking-wider truncate">Export Volume</span>
         </div>
-        <div class="text-2xl font-black text-slate-900">
+        <div class="text-xl sm:text-2xl font-black text-slate-900 mt-1">
           {{ formatVolumeKg(commodity.total_weight_kg) }}
         </div>
-        <p class="text-xs text-slate-500 mt-1">
-          {{ commodity.total_weight_ton.toLocaleString(undefined, { maximumFractionDigits: 1 }) }} Tonnes total
+        <p class="text-[11px] sm:text-xs text-slate-500 mt-1">
+          {{ commodity.total_weight_ton.toLocaleString(undefined, { maximumFractionDigits: 1 }) }} Tonnes
         </p>
       </div>
 
       <!-- Unit Price -->
-      <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
-        <div class="flex items-center justify-between text-slate-500 text-xs mb-1">
-          <span class="font-semibold uppercase tracking-wider">Average Unit Price</span>
-          <span class="p-1.5 rounded-lg bg-emerald-50 text-emerald-600">🏷️</span>
+      <div class="bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-100 shadow-xs flex flex-col justify-between items-center text-center">
+        <div class="flex items-center justify-center gap-1.5 text-slate-500 text-xs mb-1 w-full">
+          <span class="p-1 rounded-lg bg-emerald-50 text-emerald-600 text-xs flex items-center justify-center">
+            <TagIcon class="w-3.5 h-3.5" />
+          </span>
+          <span class="font-bold text-[10px] sm:text-xs text-slate-500 uppercase tracking-wider truncate">Avg Unit Price</span>
         </div>
-        <div class="text-2xl font-black text-emerald-600">
-          ${{ commodity.avg_price_usd_per_kg.toFixed(2) }} <span class="text-xs text-slate-500 font-normal">/ kg</span>
+        <div class="text-xl sm:text-2xl font-black text-emerald-600 mt-1">
+          ${{ commodity.avg_price_usd_per_kg.toFixed(2) }} <span class="text-[11px] sm:text-xs text-slate-500 font-normal">/ kg</span>
         </div>
-        <p class="text-xs text-slate-500 mt-1 font-mono">
+        <p class="text-[11px] sm:text-xs text-slate-500 mt-1">
           {{ Math.round(commodity.avg_price_khr_per_kg).toLocaleString() }} ៛ / kg
         </p>
       </div>
 
       <!-- Export Markets Count -->
-      <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
-        <div class="flex items-center justify-between text-slate-500 text-xs mb-1">
-          <span class="font-semibold uppercase tracking-wider">Destination Markets</span>
-          <span class="p-1.5 rounded-lg bg-indigo-50 text-indigo-600">🌏</span>
+      <div class="bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-100 shadow-xs flex flex-col justify-between items-center text-center">
+        <div class="flex items-center justify-center gap-1.5 text-slate-500 text-xs mb-1 w-full">
+          <span class="p-1 rounded-lg bg-indigo-50 text-indigo-600 text-xs flex items-center justify-center">
+            <GlobeIcon class="w-3.5 h-3.5" />
+          </span>
+          <span class="font-bold text-[10px] sm:text-xs text-slate-500 uppercase tracking-wider truncate">Destinations</span>
         </div>
-        <div class="text-2xl font-black text-indigo-600">
-          {{ commodity.num_markets }} <span class="text-xs text-slate-500 font-normal">Countries</span>
+        <div class="text-xl sm:text-2xl font-black text-indigo-600 mt-1">
+          {{ commodity.num_markets }} <span class="text-[11px] sm:text-xs text-slate-500 font-normal">Countries</span>
         </div>
-        <p class="text-xs text-slate-500 mt-1 truncate">
+        <p class="text-[11px] sm:text-xs text-slate-500 mt-1 truncate" :title="topMarketName">
           Top: <strong>{{ topMarketName }}</strong>
         </p>
       </div>
     </div>
+
 
     <!-- World Map of Destination Markets -->
     <WorldExportMap
@@ -181,11 +199,13 @@
         </div>
 
         <div class="px-4 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-extrabold flex items-center gap-2 self-start sm:self-auto shadow-2xs">
-          <span>⚡ Value Multiplier:</span>
+          <ZapIcon class="w-3.5 h-3.5 text-emerald-600" />
+          <span>Value Multiplier:</span>
           <span class="text-sm font-black text-emerald-700">
             {{ (commodity.raw_vs_processed.proc_price_usd_per_kg / Math.max(0.01, commodity.raw_vs_processed.raw_price_usd_per_kg)).toFixed(1) }}x
           </span>
         </div>
+
       </div>
 
       <!-- Side-by-side Raw vs Processed Cards -->
@@ -304,7 +324,8 @@
           <tbody class="divide-y divide-slate-100">
             <tr v-for="(m, idx) in commodity.market_breakdown" :key="m.country" class="hover:bg-slate-50 transition-colors">
               <td class="p-3 text-center font-bold text-slate-400">{{ idx + 1 }}</td>
-              <td class="p-3 font-bold text-slate-900">{{ getCountryFlag(m.country) }} {{ m.country }}</td>
+              <td class="p-3 font-bold text-slate-900">{{ getCountryFlag(m.country) }} {{ getDisplayCountryName(m.country) }}</td>
+
               <td class="p-3 text-right font-medium text-slate-700">{{ formatVolumeKg(m.weight_kg) }}</td>
               <td class="p-3 text-right font-bold text-slate-900">{{ formatRevenue(m.val_usd) }}</td>
               <td class="p-3 text-right font-mono text-slate-500">{{ formatKhrBillions(m.val_khr) }}</td>
@@ -348,12 +369,50 @@ import {
   TooltipComponent,
   LegendComponent,
   GridComponent,
+  DataZoomComponent,
+  ToolboxComponent
 } from 'echarts/components';
-import VChart from 'vue-echarts';
-import { ArrowLeft as ArrowLeftIcon, ArrowRight as ArrowRightIcon } from 'lucide-vue-next';
+import {
+  ArrowLeft as ArrowLeftIcon,
+  ArrowRight as ArrowRightIcon,
+  Calendar as CalendarIcon,
+  DollarSign as DollarSignIcon,
+  Package as PackageIcon,
+  Tag as TagIcon,
+  Globe as GlobeIcon,
+  Scale as ScaleIcon,
+  Zap as ZapIcon
+} from 'lucide-vue-next';
 import { useDatasetStore } from '../stores/datasetStore';
+import { getCountryFlag, getDisplayCountryName } from '../utils/countryRegistry';
 import WorldExportMap from '../components/dashboard/WorldExportMap.vue';
 import type { CommodityDetail } from '../types/dataset';
+
+
+function formatDisplayMonth(ym: string | undefined | null): string {
+  if (!ym) return '';
+  const clean = ym.trim();
+  if (/^\d{4}-\d{2}$/.test(clean)) {
+    const [y, m] = clean.split('-').map(Number);
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const monthName = monthNames[m - 1];
+    if (monthName) return `${monthName} ${y}`;
+  }
+  return clean;
+}
+
+const liveDisplayPeriod = computed(() => {
+  const pub = store.dashboardData?.publication;
+  if (pub?.start_month && pub?.end_month) {
+    return `${formatDisplayMonth(pub.start_month)} – ${formatDisplayMonth(pub.end_month)}`;
+  }
+  const begin = store.dashboardData?.begin_date;
+  const end = store.dashboardData?.end_date;
+  if (begin && end) {
+    return `${formatDisplayMonth(begin)} – ${formatDisplayMonth(end)}`;
+  }
+  return '';
+});
 
 use([
   CanvasRenderer,
@@ -363,6 +422,8 @@ use([
   TooltipComponent,
   LegendComponent,
   GridComponent,
+  DataZoomComponent,
+  ToolboxComponent
 ]);
 
 const route = useRoute();
@@ -386,25 +447,15 @@ const topMarketName = computed(() => {
 });
 
 const goBack = () => {
-  router.push('/');
+  router.push('/dashboard');
 };
 
 const goToCompare = () => {
   router.push(`/compare?a=${currentHs8Code.value}`);
 };
 
-const COUNTRY_FLAGS: Record<string, string> = {
-  'Vietnam': '🇻🇳', 'China': '🇨🇳', 'Thailand': '🇹🇭', 'Japan': '🇯🇵',
-  'United States': '🇺🇸', 'USA': '🇺🇸', 'France': '🇫🇷', 'South Korea': '🇰🇷',
-  'Taiwan': '🇹🇼', 'India': '🇮🇳', 'Malaysia': '🇲🇾', 'Singapore': '🇸🇬',
-  'Germany': '🇩🇪', 'Netherlands': '🇳🇱', 'Italy': '🇮🇹', 'United Kingdom': '🇬🇧',
-};
-
-const getCountryFlag = (name: string): string => {
-  return COUNTRY_FLAGS[name] || '🌐';
-};
-
 const formatRevenue = (valUsd: number): string => {
+
   if (!valUsd || valUsd === 0) return '$0 USD';
   if (valUsd < 1_000_000) {
     const kUsd = Math.round((valUsd / 1000) * 10) / 10;
@@ -448,6 +499,8 @@ const monthlyTrendOption = computed(() => {
     return {
       tooltip: {
         trigger: 'axis',
+        confine: true,
+        extraCssText: 'max-width: 240px; white-space: normal; word-break: break-word; border-radius: 10px; padding: 8px 12px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15); z-index: 50;',
         formatter: (params: any) => {
           const p = params[0];
           const rawUsd = data[p.dataIndex]?.val_usd || 0;
@@ -455,6 +508,7 @@ const monthlyTrendOption = computed(() => {
         }
       },
       grid: { top: 25, right: 20, bottom: 25, left: 55 },
+      dataZoom: [{ type: 'inside', xAxisIndex: 0, zoomOnMouseWheel: true, moveOnMouseMove: true }],
       xAxis: { type: 'category', data: xLabels, axisLabel: { fontSize: 11 } },
       yAxis: {
         type: 'value',
@@ -493,6 +547,8 @@ const monthlyTrendOption = computed(() => {
     return {
       tooltip: {
         trigger: 'axis',
+        confine: true,
+        extraCssText: 'max-width: 240px; white-space: normal; word-break: break-word; border-radius: 10px; padding: 8px 12px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15); z-index: 50;',
         formatter: (params: any) => {
           const p = params[0];
           const rawKg = data[p.dataIndex]?.weight_kg || 0;
@@ -500,6 +556,7 @@ const monthlyTrendOption = computed(() => {
         }
       },
       grid: { top: 25, right: 20, bottom: 25, left: 55 },
+      dataZoom: [{ type: 'inside', xAxisIndex: 0, zoomOnMouseWheel: true, moveOnMouseMove: true }],
       xAxis: { type: 'category', data: xLabels, axisLabel: { fontSize: 11 } },
       yAxis: {
         type: 'value',
@@ -542,6 +599,8 @@ const priceTrendOption = computed(() => {
   return {
     tooltip: {
       trigger: 'axis',
+      confine: true,
+      extraCssText: 'max-width: 240px; white-space: normal; word-break: break-word; border-radius: 10px; padding: 8px 12px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15); z-index: 50;',
       formatter: (params: any) => {
         const idx = params[0]?.dataIndex;
         const d = data[idx];
@@ -554,6 +613,7 @@ const priceTrendOption = computed(() => {
     },
     legend: { data: ['USD/kg ($)', 'KHR/kg (៛)'], top: 0, textStyle: { fontSize: 11 } },
     grid: { top: 35, right: 65, bottom: 25, left: 50 },
+    dataZoom: [{ type: 'inside', xAxisIndex: 0, zoomOnMouseWheel: true, moveOnMouseMove: true }],
     xAxis: { type: 'category', data: xLabels, axisLabel: { fontSize: 11 } },
     yAxis: [
       {

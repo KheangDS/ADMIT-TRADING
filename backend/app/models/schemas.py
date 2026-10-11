@@ -17,6 +17,7 @@ class RecalculateRequest(BaseModel):
 
 class ChatRequest(BaseModel):
     session_id: Optional[str] = "master"
+    publication_id: Optional[str] = None
     question: str
     exchange_rate: Optional[float] = Field(default=None, description="KHR to 1 USD exchange rate (defaults to real-time MEF rate)")
 
